@@ -1279,6 +1279,7 @@ class ReplicaManager(val config: KafkaConfig,
             s"correlation id $correlationId from controller $controllerId " +
             s"epoch ${leaderAndIsrRequest.controllerEpoch}")
         }
+      val topicIds = leaderAndIsrRequest.topicIds()
 
       val response = {
         if (leaderAndIsrRequest.controllerEpoch < controllerEpoch) {
@@ -1385,6 +1386,26 @@ class ReplicaManager(val config: KafkaConfig,
            */
             if (localLog(topicPartition).isEmpty)
               markPartitionOffline(topicPartition)
+            else {
+              // Write the partition metadata file if it is empty.
+              val log = localLog(topicPartition).get
+              if (log.partitionMetadataFile.isEmpty || log.partitionMetadataFile.get.notExists()) {
+                stateChangeLogger.warn(s"Partition metadata file for topic ${topicPartition.topic} +" +
+                  s"partition ${topicPartition.partition} is offline.")
+              } else {
+                if (log.partitionMetadataFile.get.isEmpty()) {
+                  log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic), topicPartition.topic, topicPartition.partition)
+                } else {
+                  // Check if the topic ID in the file matches the topic ID provided in the request.
+                  // Warn if they do not match.
+                  val partitionMetadata = log.partitionMetadataFile.get.read()
+                  if (partitionMetadata.topicId != topicIds.get(topicPartition.topic)) {
+                    stateChangeLogger.warn(s"Topic Id on file: ${partitionMetadata.topicId.toString} does not" +
+                      s"match the topic Id provided in the request: ${topicIds.get(topicPartition.topic)}.")
+                  }
+                }
+              }
+            }
           }
 
           // we initialize highwatermark thread after the first leaderisrrequest. This ensures that all the partitions
@@ -1398,7 +1419,7 @@ class ReplicaManager(val config: KafkaConfig,
           onLeadershipChange(partitionsBecomeLeader, partitionsBecomeFollower)
           val responsePartitions = responseMap.iterator.map { case (tp, error) =>
             new LeaderAndIsrPartitionError()
-              .setTopicName(tp.topic)
+              .setTopicID(topicIds.get(tp.topic))
               .setPartitionIndex(tp.partition)
               .setErrorCode(error.code)
           }.toBuffer

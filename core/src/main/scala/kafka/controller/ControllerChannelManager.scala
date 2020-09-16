@@ -390,7 +390,6 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
         .setRemovingReplicas(replicaAssignment.removingReplicas.map(Integer.valueOf).asJava)
         .setIsNew(isNew || alreadyNew))
     }
-
     addUpdateMetadataRequestForBrokers(controllerContext.liveOrShuttingDownBrokerIds.toSeq, Set(topicPartition))
   }
 
@@ -481,8 +480,15 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
           _.node(config.interBrokerListenerName)
         }
         val brokerEpoch = controllerContext.liveBrokerIdAndEpochs(broker)
+
+        val topicIds = leaderAndIsrPartitionStates.keys
+          .map(_.topic)
+          .toSet
+          .map((topic: String) => (topic, controllerContext.topicIds(topic)))
+          .toMap
+
         val leaderAndIsrRequestBuilder = new LeaderAndIsrRequest.Builder(leaderAndIsrRequestVersion, controllerId,
-          controllerEpoch, brokerEpoch, leaderAndIsrPartitionStates.values.toBuffer.asJava, leaders.asJava)
+          controllerEpoch, brokerEpoch, leaderAndIsrPartitionStates.values.toBuffer.asJava, topicIds.asJava, leaders.asJava)
         sendRequest(broker, leaderAndIsrRequestBuilder, (r: AbstractResponse) => {
           val leaderAndIsrResponse = r.asInstanceOf[LeaderAndIsrResponse]
           sendEvent(LeaderAndIsrResponseReceived(leaderAndIsrResponse, broker))

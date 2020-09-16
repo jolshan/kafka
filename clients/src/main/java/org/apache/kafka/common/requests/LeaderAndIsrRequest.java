@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class LeaderAndIsrRequest extends AbstractControlRequest {
@@ -43,12 +44,15 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
     public static class Builder extends AbstractControlRequest.Builder<LeaderAndIsrRequest> {
 
         private final List<LeaderAndIsrPartitionState> partitionStates;
+        private final Map<String, UUID> topicIds;
         private final Collection<Node> liveLeaders;
 
         public Builder(short version, int controllerId, int controllerEpoch, long brokerEpoch,
-                       List<LeaderAndIsrPartitionState> partitionStates, Collection<Node> liveLeaders) {
+                       List<LeaderAndIsrPartitionState> partitionStates, Map<String, UUID> topicIds,
+                       Collection<Node> liveLeaders) {
             super(ApiKeys.LEADER_AND_ISR, version, controllerId, controllerEpoch, brokerEpoch);
             this.partitionStates = partitionStates;
+            this.topicIds = topicIds;
             this.liveLeaders = liveLeaders;
         }
 
@@ -67,7 +71,7 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
                 .setLiveLeaders(leaders);
 
             if (version >= 2) {
-                Map<String, LeaderAndIsrTopicState> topicStatesMap = groupByTopic(partitionStates);
+                Map<String, LeaderAndIsrTopicState> topicStatesMap = groupByTopic(version, partitionStates, topicIds);
                 data.setTopicStates(new ArrayList<>(topicStatesMap.values()));
             } else {
                 data.setUngroupedPartitionStates(partitionStates);
@@ -76,16 +80,27 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
             return new LeaderAndIsrRequest(data, version);
         }
 
-        private static Map<String, LeaderAndIsrTopicState> groupByTopic(List<LeaderAndIsrPartitionState> partitionStates) {
+        private static Map<String, LeaderAndIsrTopicState> groupByTopic(short version, List<LeaderAndIsrPartitionState> partitionStates, Map<String, UUID> topicIds) {
             Map<String, LeaderAndIsrTopicState> topicStates = new HashMap<>();
             // We don't null out the topic name in LeaderAndIsrRequestPartition since it's ignored by
             // the generated code if version >= 2
-            for (LeaderAndIsrPartitionState partition : partitionStates) {
-                LeaderAndIsrTopicState topicState = topicStates.computeIfAbsent(partition.topicName(),
-                    t -> new LeaderAndIsrTopicState().setTopicName(partition.topicName()));
-                topicState.partitionStates().add(partition);
+            if (version >= 4) {
+                for (LeaderAndIsrPartitionState partition : partitionStates) {
+                    LeaderAndIsrTopicState topicState = topicStates.computeIfAbsent(partition.topicName(),
+                        t -> new LeaderAndIsrTopicState().setTopicName(partition.topicName()).
+                               setTopicID(topicIds.get(partition.topicName())));
+                    topicState.partitionStates().add(partition);
+                }
+                return topicStates;
+            } else {
+                for (LeaderAndIsrPartitionState partition : partitionStates) {
+                    LeaderAndIsrTopicState topicState = topicStates.computeIfAbsent(partition.topicName(),
+                        t -> new LeaderAndIsrTopicState().setTopicName(partition.topicName()));
+                    topicState.partitionStates().add(partition);
+                }
+                return topicStates;
             }
-            return topicStates;
+
         }
 
         @Override
@@ -96,6 +111,7 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
                 .append(", controllerEpoch=").append(controllerEpoch)
                 .append(", brokerEpoch=").append(brokerEpoch)
                 .append(", partitionStates=").append(partitionStates)
+                .append(", topicIds=").append(topicIds)
                 .append(", liveLeaders=(").append(Utils.join(liveLeaders, ", ")).append(")")
                 .append(")");
             return bld.toString();
@@ -169,6 +185,14 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
             return () -> new FlattenedIterator<>(data.topicStates().iterator(),
                 topicState -> topicState.partitionStates().iterator());
         return data.ungroupedPartitionStates();
+    }
+
+    public Map<String, UUID> topicIds() {
+        Map<String, UUID> topicIds = new HashMap<>();
+        for (LeaderAndIsrTopicState ts : data.topicStates()) {
+            topicIds.put(ts.topicName(), ts.topicID());
+        }
+        return topicIds;
     }
 
     public List<LeaderAndIsrLiveLeader> liveLeaders() {
