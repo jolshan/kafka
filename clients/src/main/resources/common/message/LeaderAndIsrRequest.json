@@ -31,7 +31,8 @@
       "about": "The current controller epoch." },
     { "name": "BrokerEpoch", "type": "int64", "versions": "2+", "ignorable": true, "default": "-1",
       "about": "The current broker epoch." },
-    { "name":  "Type", "type":  "int8", "versions": "4+"},
+    { "name":  "Type", "type":  "int8", "versions": "4+", "tag": 0,
+      "taggedVersions": "4+", "ignorable": true},
     { "name": "UngroupedPartitionStates", "type": "[]LeaderAndIsrPartitionState", "versions": "0-1",
       "about": "The state of each partition, in a v0 or v1 message." },
     // In v0 or v1 requests, each partition is listed alongside its topic name.
@@ -41,7 +42,8 @@
       "about": "Each topic.", "fields": [
       { "name": "TopicName", "type": "string", "versions": "2+", "entityType": "topicName",
         "about": "The topic name." },
-      { "name": "TopicID", "type": "uuid", "versions": "4+",
+      { "name": "TopicID", "type": "uuid", "versions": "4+", "tag": 0,
+        "taggedVersions": "4+", "ignorable": true,
         "about": "The unique topicId." },
       { "name": "PartitionStates", "type": "[]LeaderAndIsrPartitionState", "versions": "2+",
         "about": "The state of each partition" }

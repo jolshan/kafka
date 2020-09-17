@@ -84,7 +84,7 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
             Map<String, LeaderAndIsrTopicState> topicStates = new HashMap<>();
             // We don't null out the topic name in LeaderAndIsrRequestPartition since it's ignored by
             // the generated code if version >= 2
-            if (version >= 4) {
+            if (version > 3) {
                 for (LeaderAndIsrPartitionState partition : partitionStates) {
                     LeaderAndIsrTopicState topicState = topicStates.computeIfAbsent(partition.topicName(),
                         t -> new LeaderAndIsrTopicState().setTopicName(partition.topicName()).
@@ -157,7 +157,6 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
         List<LeaderAndIsrPartitionError> partitions = new ArrayList<>();
         for (LeaderAndIsrPartitionState partition : partitionStates()) {
             partitions.add(new LeaderAndIsrPartitionError()
-                .setTopicName(partition.topicName())
                 .setPartitionIndex(partition.partitionIndex())
                 .setErrorCode(error.code()));
         }
