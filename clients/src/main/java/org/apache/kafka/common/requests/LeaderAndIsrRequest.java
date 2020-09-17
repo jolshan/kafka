@@ -120,10 +120,12 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
     }
 
     private final LeaderAndIsrRequestData data;
+    private final short version;
 
     LeaderAndIsrRequest(LeaderAndIsrRequestData data, short version) {
         super(ApiKeys.LEADER_AND_ISR, version);
         this.data = data;
+        this.version = version;
         // Do this from the constructor to make it thread-safe (even though it's only needed when some methods are called)
         normalize();
     }
@@ -155,10 +157,28 @@ public class LeaderAndIsrRequest extends AbstractControlRequest {
         responseData.setErrorCode(error.code());
 
         List<LeaderAndIsrPartitionError> partitions = new ArrayList<>();
-        for (LeaderAndIsrPartitionState partition : partitionStates()) {
-            partitions.add(new LeaderAndIsrPartitionError()
-                .setPartitionIndex(partition.partitionIndex())
-                .setErrorCode(error.code()));
+        if (version < 4) {
+            for (LeaderAndIsrPartitionState partition : partitionStates()) {
+                partitions.add(new LeaderAndIsrPartitionError()
+                        .setTopicName(partition.topicName())
+                        .setPartitionIndex(partition.partitionIndex())
+                        .setErrorCode(error.code()));
+            }
+        } else if (version == 4) {
+            for (LeaderAndIsrPartitionState partition : partitionStates()) {
+                partitions.add(new LeaderAndIsrPartitionError()
+                        .setTopicName(partition.topicName())
+                        .setTopicID(topicIds().get(partition.topicName()))
+                        .setPartitionIndex(partition.partitionIndex())
+                        .setErrorCode(error.code()));
+            }
+        } else {
+            for (LeaderAndIsrPartitionState partition : partitionStates()) {
+                partitions.add(new LeaderAndIsrPartitionError()
+                        .setTopicID(topicIds().get(partition.topicName()))
+                        .setPartitionIndex(partition.partitionIndex())
+                        .setErrorCode(error.code()));
+            }
         }
         responseData.setPartitionErrors(partitions);
         return new LeaderAndIsrResponse(responseData);

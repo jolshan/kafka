@@ -71,7 +71,7 @@ public class LeaderAndIsrResponseTest {
 
     @Test
     public void testErrorCountsWithTopLevelError() {
-        List<LeaderAndIsrPartitionError> partitions = createPartitions("foo",
+        List<LeaderAndIsrPartitionError> partitions = createPartitions(UUID.randomUUID(),
             asList(Errors.NONE, Errors.NOT_LEADER_OR_FOLLOWER));
         LeaderAndIsrResponse response = new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
             .setErrorCode(Errors.UNKNOWN_SERVER_ERROR.code())
@@ -81,7 +81,7 @@ public class LeaderAndIsrResponseTest {
 
     @Test
     public void testErrorCountsNoTopLevelError() {
-        List<LeaderAndIsrPartitionError> partitions = createPartitions("foo",
+        List<LeaderAndIsrPartitionError> partitions = createPartitions(UUID.randomUUID(),
             asList(Errors.NONE, Errors.CLUSTER_AUTHORIZATION_FAILED));
         LeaderAndIsrResponse response = new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
             .setErrorCode(Errors.NONE.code())
@@ -94,7 +94,7 @@ public class LeaderAndIsrResponseTest {
 
     @Test
     public void testToString() {
-        List<LeaderAndIsrPartitionError> partitions = createPartitions("foo",
+        List<LeaderAndIsrPartitionError> partitions = createPartitions(UUID.randomUUID(),
             asList(Errors.NONE, Errors.CLUSTER_AUTHORIZATION_FAILED));
         LeaderAndIsrResponse response = new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
             .setErrorCode(Errors.NONE.code())
@@ -105,12 +105,12 @@ public class LeaderAndIsrResponseTest {
         assertTrue(responseStr.contains("errorCode=" + Errors.NONE.code()));
     }
 
-    private List<LeaderAndIsrPartitionError> createPartitions(String topicName, List<Errors> errors) {
+    private List<LeaderAndIsrPartitionError> createPartitions(UUID topicID, List<Errors> errors) {
         List<LeaderAndIsrPartitionError> partitions = new ArrayList<>();
         int partitionIndex = 0;
         for (Errors error : errors) {
             partitions.add(new LeaderAndIsrPartitionError()
-                .setTopicName(topicName)
+                .setTopicID(topicID)
                 .setPartitionIndex(partitionIndex++)
                 .setErrorCode(error.code()));
         }

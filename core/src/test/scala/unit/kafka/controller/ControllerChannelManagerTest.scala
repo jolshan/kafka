@@ -82,6 +82,8 @@ class ControllerChannelManagerTest {
     assertEquals(partitions.map { case (k, v) => (k, v.isr) },
       leaderAndIsrRequest.partitionStates.asScala.map(p => new TopicPartition(p.topicName, p.partitionIndex) -> p.isr.asScala).toMap)
     val topicIds = leaderAndIsrRequest.topicIds();
+    val topicNames = topicIds.asScala.map{ case (k,v) => (v, k)}
+
 
     applyLeaderAndIsrResponseCallbacks(Errors.NONE, batch.sentRequests(2).toList)
     assertEquals(1, batch.sentEvents.size)
@@ -89,9 +91,9 @@ class ControllerChannelManagerTest {
     val LeaderAndIsrResponseReceived(leaderAndIsrResponse, brokerId) = batch.sentEvents.head
     assertEquals(2, brokerId)
     assertEquals(partitions.keySet,
-      leaderAndIsrResponse.partitions.asScala.map(p => new TopicPartition(p.topicName, p.partitionIndex)).toSet)
+      leaderAndIsrResponse.partitions.asScala.map(p => new TopicPartition(topicNames.get(p.topicID).get, p.partitionIndex)).toSet)
     leaderAndIsrResponse.partitions.forEach(partition =>
-      assertEquals(topicIds.get(partition.topicName), partition.topicID))
+      assertEquals(topicIds.get(topicNames.get(partition.topicID).get), partition.topicID))
   }
 
   @Test
@@ -827,7 +829,6 @@ class ControllerChannelManagerTest {
       val topicIds = leaderAndIsrRequest.topicIds()
       val partitionErrors = leaderAndIsrRequest.partitionStates.asScala.map(p =>
         new LeaderAndIsrPartitionError()
-          .setTopicName(p.topicName)
           .setTopicID(topicIds.get(p.topicName))
           .setPartitionIndex(p.partitionIndex)
           .setErrorCode(error.code))
