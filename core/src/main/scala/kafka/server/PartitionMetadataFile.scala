@@ -21,7 +21,7 @@ object PartitionMetadataFile {
 
   object PartitionMetadataFileFormatter {
     def toFile(data: PartitionMetadata): String = {
-      s"Metadata schema version: $CurrentVersion\nTopic ID: ${data.topicId}\nTopic name: ${data.topicName}\nPartition: ${data.partition}"
+      s"Metadata schema version: ${data.version}\nTopic ID: ${data.topicId}"
     }
 
   }
@@ -35,8 +35,6 @@ object PartitionMetadataFile {
 
       var line: String = null
       var metadataTopicId: UUID = null
-      var metadataTopicName: String = null
-      var metadataPartition: Int = -1
       try {
         line = reader.readLine()
         WhiteSpacesPattern.split(line) match {
@@ -47,17 +45,7 @@ object PartitionMetadataFile {
                 case Array(_, topicId) => metadataTopicId = UUID.fromString(topicId)
                 case _ => throw malformedLineException(line)
               }
-              line = reader.readLine()
-              WhiteSpacesPattern.split(line) match {
-                case Array(_, topicName) => metadataTopicName = topicName
-                case _ => throw malformedLineException(line)
-              }
-              line = reader.readLine()
-              WhiteSpacesPattern.split(line) match {
-                case Array(_, partition) => metadataPartition = partition.toInt
-                case _ => throw malformedLineException(line)
-              }
-              new PartitionMetadata(metadataTopicId, metadataTopicName, metadataPartition)
+              new PartitionMetadata(CurrentVersion, metadataTopicId)
             } else {
               throw new IOException(s"Unrecognized version of the checkpoint file ($location): " + version)
             }
@@ -71,7 +59,7 @@ object PartitionMetadataFile {
 
 }
 
-class PartitionMetadata(val topicId: UUID, val topicName: String, val partition: Int)
+class PartitionMetadata(val version: Int, val topicId: UUID)
 
 
 class PartitionMetadataFile(val file: File,
@@ -87,14 +75,14 @@ class PartitionMetadataFile(val file: File,
   try Files.createFile(file.toPath) // create the file if it doesn't exist
   catch { case _: FileAlreadyExistsException => }
 
-  def write(topicId: UUID, topicName: String, partition: Int): Unit = {
+  def write(topicId: UUID): Unit = {
     lock synchronized {
       try {
         // write to temp file and then swap with the existing file
         val fileOutputStream = new FileOutputStream(tempPath.toFile)
         val writer = new BufferedWriter(new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8))
         try {
-          writer.write(PartitionMetadataFileFormatter.toFile(new PartitionMetadata(topicId, topicName, partition)))
+          writer.write(PartitionMetadataFileFormatter.toFile(new PartitionMetadata(CurrentVersion,topicId)))
           writer.flush()
           fileOutputStream.getFD().sync()
         } finally {

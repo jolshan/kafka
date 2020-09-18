@@ -1396,14 +1396,14 @@ class ReplicaManager(val config: KafkaConfig,
                     s"partition ${topicPartition.partition} is offline.")
                 } else {
                   if (log.partitionMetadataFile.get.isEmpty()) {
-                    log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic), topicPartition.topic, topicPartition.partition)
+                    log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic))
                   } else {
                     // Check if the topic ID in the file matches the topic ID provided in the request.
                     // Warn if they do not match.
                     val partitionMetadata = log.partitionMetadataFile.get.read()
                     if (partitionMetadata.topicId != topicIds.get(topicPartition.topic)) {
                       stateChangeLogger.warn(s"Topic Id on file: ${partitionMetadata.topicId.toString} does not" +
-                        s"match the topic Id provided in the request: ${topicIds.get(topicPartition.topic)}.")
+                        s" match the topic Id provided in the request: ${topicIds.get(topicPartition.topic)}.")
                     }
                   }
                 }
@@ -1426,14 +1426,6 @@ class ReplicaManager(val config: KafkaConfig,
               responseMap.iterator.map { case (tp, error) =>
                 new LeaderAndIsrPartitionError()
                   .setTopicName(tp.topic)
-                  .setPartitionIndex(tp.partition)
-                  .setErrorCode(error.code)
-              }.toBuffer
-            } else if (version == 4) {
-              responseMap.iterator.map { case (tp, error) =>
-                new LeaderAndIsrPartitionError()
-                  .setTopicName(tp.topic)
-                  .setTopicID(topicIds.get(tp.topic))
                   .setPartitionIndex(tp.partition)
                   .setErrorCode(error.code)
               }.toBuffer

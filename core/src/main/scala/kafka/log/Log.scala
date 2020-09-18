@@ -1014,8 +1014,7 @@ class Log(@volatile private var _dir: File,
             partitionMetadataFile.get.isEmpty()) {
             val partitionMetadata = partitionMetadataFile.get.read()
             initializePartitionMetadata()
-            partitionMetadataFile.get.write(partitionMetadata.topicId, partitionMetadata.topicName,
-                                            partitionMetadata.partition)
+            partitionMetadataFile.get.write(partitionMetadata.topicId)
           } else {
             initializePartitionMetadata()
           }
