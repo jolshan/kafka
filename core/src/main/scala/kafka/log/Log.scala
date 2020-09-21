@@ -291,7 +291,7 @@ class Log(@volatile private var _dir: File,
   // Visible for testing
   @volatile var leaderEpochCache: Option[LeaderEpochFileCache] = None
 
-  var partitionMetadataFile : Option[PartitionMetadataFile] = None
+  @volatile var partitionMetadataFile : Option[PartitionMetadataFile] = None
 
   locally {
     // create the log directory if it doesn't exist
