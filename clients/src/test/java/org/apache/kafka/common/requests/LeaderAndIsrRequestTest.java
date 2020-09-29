@@ -181,7 +181,7 @@ public class LeaderAndIsrRequestTest {
             partitionStates.add(new LeaderAndIsrPartitionState()
                 .setTopicName(tp.topic())
                 .setPartitionIndex(tp.partition()));
-            topicIds.putIfAbsent(tp.topic(), UUID.randomUUID());
+            topicIds.put(tp.topic(), UUID.randomUUID());
         }
         LeaderAndIsrRequest.Builder builder = new LeaderAndIsrRequest.Builder((short) 2, 0, 0, 0,
             partitionStates, topicIds, Collections.emptySet());

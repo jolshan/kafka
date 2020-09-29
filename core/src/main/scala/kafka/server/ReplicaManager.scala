@@ -41,6 +41,7 @@ import org.apache.kafka.common.internals.Topic
 import org.apache.kafka.common.message.LeaderAndIsrRequestData.LeaderAndIsrPartitionState
 import org.apache.kafka.common.message.DeleteRecordsResponseData.DeleteRecordsPartitionResult
 import org.apache.kafka.common.message.{DescribeLogDirsResponseData, FetchResponseData, LeaderAndIsrResponseData}
+import org.apache.kafka.common.message.LeaderAndIsrResponseData.LeaderAndIsrTopicError
 import org.apache.kafka.common.message.LeaderAndIsrResponseData.LeaderAndIsrPartitionError
 import org.apache.kafka.common.message.StopReplicaRequestData.StopReplicaPartitionState
 import org.apache.kafka.common.metrics.Metrics
@@ -1410,20 +1411,19 @@ class ReplicaManager(val config: KafkaConfig,
               val id = topicIds.get(topicPartition.topic())
               if (id != null && id != MessageUtil.ZERO_UUID) {
                 val log = localLog(topicPartition).get
-                if (log.partitionMetadataFile.isEmpty || log.partitionMetadataFile.get.notExists()) {
-                  stateChangeLogger.warn(s"Partition metadata file for topic ${topicPartition.topic} +" +
-                    s"partition ${topicPartition.partition} is offline.")
+                if (log.topicID != MessageUtil.ZERO_UUID) {
+                  if (log.topicID != topicIds.get(topicPartition.topic)) {
+                    // Check if topic ID in request matches the topic ID in memory.
+                    stateChangeLogger.warn(s"Topic Id in memory: ${log.topicID.toString} does not" +
+                      s" match the topic Id provided in the request: " +
+                      s"${topicIds.get(topicPartition.topic).toString}.")
+                  }
                 } else {
                   if (log.partitionMetadataFile.get.isEmpty()) {
                     log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic))
+                    log.topicID = topicIds.get(topicPartition.topic)
                   } else {
-                    // Check if the topic ID in the file matches the topic ID provided in the request.
-                    // Warn if they do not match.
-                    val partitionMetadata = log.partitionMetadataFile.get.read()
-                    if (partitionMetadata.topicId != topicIds.get(topicPartition.topic)) {
-                      stateChangeLogger.warn(s"Topic Id on file: ${partitionMetadata.topicId.toString} does not" +
-                        s" match the topic Id provided in the request: ${topicIds.get(topicPartition.topic)}.")
-                    }
+                    stateChangeLogger.warn("Partition metadata file already contains content.")
                   }
                 }
               }
@@ -1440,25 +1440,38 @@ class ReplicaManager(val config: KafkaConfig,
           replicaAlterLogDirsManager.shutdownIdleFetcherThreads()
           onLeadershipChange(partitionsBecomeLeader, partitionsBecomeFollower)
           val version = leaderAndIsrRequest.version()
-          val responsePartitions =
-            if (version < 4) {
-              responseMap.iterator.map { case (tp, error) =>
-                new LeaderAndIsrPartitionError()
-                  .setTopicName(tp.topic)
+          if (version < 4) {
+            val responsePartitions = responseMap.iterator.map { case (tp, error) =>
+              new LeaderAndIsrPartitionError()
+                .setTopicName(tp.topic)
+                .setPartitionIndex(tp.partition)
+                .setErrorCode(error.code)
+            }.toBuffer
+            new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
+              .setErrorCode(Errors.NONE.code)
+              .setPartitionErrors(responsePartitions.asJava))
+          } else {
+            val topics = new mutable.HashMap[String, List[LeaderAndIsrPartitionError]]
+            responseMap.asJava.forEach { case (tp, error) =>
+              if (topics.get(tp.topic) == None) {
+                topics.put(tp.topic, List(new LeaderAndIsrPartitionError()
+                                                                .setPartitionIndex(tp.partition)
+                                                                .setErrorCode(error.code)))
+              } else {
+                topics.put(tp.topic, new LeaderAndIsrPartitionError()
                   .setPartitionIndex(tp.partition)
-                  .setErrorCode(error.code)
-              }.toBuffer
-            } else {
-              responseMap.iterator.map { case (tp, error) =>
-                new LeaderAndIsrPartitionError()
-                  .setTopicID(topicIds.get(tp.topic))
-                  .setPartitionIndex(tp.partition)
-                  .setErrorCode(error.code)
-              }.toBuffer
+                  .setErrorCode(error.code)::topics.get(tp.topic).get)
+              }
             }
-          new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
-            .setErrorCode(Errors.NONE.code)
-            .setPartitionErrors(responsePartitions.asJava))
+            val topicErrors = topics.iterator.map { case (topic, partitionError) =>
+              new LeaderAndIsrTopicError()
+                .setTopicID(topicIds.get(topic))
+                .setPartitionErrors(partitionError.asJava)
+            }.toBuffer
+            new LeaderAndIsrResponse(new LeaderAndIsrResponseData()
+              .setErrorCode(Errors.NONE.code)
+              .setTopics(topicErrors.asJava))
+          }
         }
       }
       val endMs = time.milliseconds()
