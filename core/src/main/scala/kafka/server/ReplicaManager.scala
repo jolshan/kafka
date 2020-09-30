@@ -1407,18 +1407,21 @@ class ReplicaManager(val config: KafkaConfig,
             if (localLog(topicPartition).isEmpty)
               markPartitionOffline(topicPartition)
             else {
-              // Write the partition metadata file if it is empty and we have a topic Id to write to it
               val id = topicIds.get(topicPartition.topic())
+              // Ensure we have not received a request from an older protocol
               if (id != null && id != MessageUtil.ZERO_UUID) {
                 val log = localLog(topicPartition).get
+                // Check if the topic ID is in memory, if not, it must be new to the broker.
+                // If the broker previously wrote it to file, it would be recovered on restart after failure.
                 if (log.topicID != MessageUtil.ZERO_UUID) {
+                  // Check if topic ID in request matches the topic ID in memory.
                   if (log.topicID != topicIds.get(topicPartition.topic)) {
-                    // Check if topic ID in request matches the topic ID in memory.
                     stateChangeLogger.warn(s"Topic Id in memory: ${log.topicID.toString} does not" +
                       s" match the topic Id provided in the request: " +
                       s"${topicIds.get(topicPartition.topic).toString}.")
                   }
                 } else {
+                  // Write the partition metadata file if it is empty.
                   if (log.partitionMetadataFile.get.isEmpty()) {
                     log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic))
                     log.topicID = topicIds.get(topicPartition.topic)
