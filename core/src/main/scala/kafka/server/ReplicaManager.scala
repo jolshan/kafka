@@ -1409,13 +1409,13 @@ class ReplicaManager(val config: KafkaConfig,
             else {
               val id = topicIds.get(topicPartition.topic())
               // Ensure we have not received a request from an older protocol
-              if (id != null && id != MessageUtil.ZERO_UUID) {
+              if (id != null && !id.equals(MessageUtil.ZERO_UUID)) {
                 val log = localLog(topicPartition).get
                 // Check if the topic ID is in memory, if not, it must be new to the broker.
                 // If the broker previously wrote it to file, it would be recovered on restart after failure.
-                if (log.topicID != MessageUtil.ZERO_UUID) {
+                if (!log.topicID.equals(MessageUtil.ZERO_UUID)) {
                   // Check if topic ID in request matches the topic ID in memory.
-                  if (log.topicID != topicIds.get(topicPartition.topic)) {
+                  if (!log.topicID.equals(topicIds.get(topicPartition.topic))) {
                     stateChangeLogger.warn(s"Topic Id in memory: ${log.topicID.toString} does not" +
                       s" match the topic Id provided in the request: " +
                       s"${topicIds.get(topicPartition.topic).toString}.")

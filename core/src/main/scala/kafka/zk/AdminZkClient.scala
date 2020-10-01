@@ -159,7 +159,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
 
       if (!isUpdate) {
         var topicId = UUID.randomUUID()
-        while (topicId == Topic.SENTINEL_ID) {
+        while (topicId.equals(Topic.SENTINEL_ID)) {
           topicId = UUID.randomUUID()
         }
         zkClient.createTopicAssignment(topic, Some(topicId), assignment.map { case (k, v) => k -> v.replicas })

@@ -494,7 +494,7 @@ class KafkaZkClient private[zk] (zooKeeperClient: ZooKeeperClient, isSecure: Boo
     val updatedAssignments = topicIdReplicaAssignments.map {
       case TopicIdReplicaAssignment(topic, None, assignments) =>
         var topicId = UUID.randomUUID()
-        while (topicId == Topic.SENTINEL_ID) {
+        while (topicId.equals(Topic.SENTINEL_ID)) {
           topicId = UUID.randomUUID()
         }
         TopicIdReplicaAssignment(topic, Some(UUID.randomUUID()), assignments)
