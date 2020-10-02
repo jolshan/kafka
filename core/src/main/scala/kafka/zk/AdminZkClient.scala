@@ -158,10 +158,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
       val assignment = replicaAssignment.map { case (partitionId, replicas) => (new TopicPartition(topic,partitionId), replicas) }.toMap
 
       if (!isUpdate) {
-        var topicId = UUID.randomUUID()
-        while (topicId.equals(Topic.SENTINEL_ID)) {
-          topicId = UUID.randomUUID()
-        }
+        val topicId = UUID.randomUUID()
         zkClient.createTopicAssignment(topic, Some(topicId), assignment.map { case (k, v) => k -> v.replicas })
       } else {
         val topicIds = zkClient.getTopicIdsForTopics(Set(topic))

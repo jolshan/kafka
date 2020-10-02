@@ -32,7 +32,6 @@ import kafka.utils.Logging
 import kafka.zk.TopicZNode.TopicIdReplicaAssignment
 import kafka.zookeeper._
 import org.apache.kafka.common.errors.ControllerMovedException
-import org.apache.kafka.common.internals.Topic
 import org.apache.kafka.common.resource.{PatternType, ResourcePattern, ResourceType}
 import org.apache.kafka.common.security.token.delegation.{DelegationToken, TokenInformation}
 import org.apache.kafka.common.utils.{Time, Utils}
@@ -493,10 +492,6 @@ class KafkaZkClient private[zk] (zooKeeperClient: ZooKeeperClient, isSecure: Boo
                   expectedControllerEpochZkVersion: Int): Set[TopicIdReplicaAssignment] = {
     val updatedAssignments = topicIdReplicaAssignments.map {
       case TopicIdReplicaAssignment(topic, None, assignments) =>
-        var topicId = UUID.randomUUID()
-        while (topicId.equals(Topic.SENTINEL_ID)) {
-          topicId = UUID.randomUUID()
-        }
         TopicIdReplicaAssignment(topic, Some(UUID.randomUUID()), assignments)
       case TopicIdReplicaAssignment(topic, Some(_), _) =>
         throw new IllegalArgumentException("TopicIdReplicaAssignment for " + topic + " already contains a topic ID.")
