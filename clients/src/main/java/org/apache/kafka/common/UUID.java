@@ -81,20 +81,15 @@ public class UUID {
     /**
      * Returns true iff the obj is another UUID represented by the same two long values.
      */
+    @Override
     public boolean equals(Object obj) {
         return this.toJavaUUID().equals(uuid);
     }
 
     /**
-     * Compares this UUID with the specified UUID.
-     */
-    public int compareTo(UUID val) {
-        return uuid.compareTo(val.toJavaUUID());
-    }
-
-    /**
      * Returns a hash code for this UUID
      */
+    @Override
     public int hashCode() {
         return uuid.hashCode();
     }
@@ -102,6 +97,7 @@ public class UUID {
     /**
      * Returns a base64 string encoding of the UUID.
      */
+    @Override
     public String toString() {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(getBytesFromUuid(uuid));
     }
