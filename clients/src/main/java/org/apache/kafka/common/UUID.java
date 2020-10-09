@@ -74,16 +74,12 @@ public class UUID {
         return uuid.getLeastSignificantBits();
     }
 
-    private java.util.UUID toJavaUUID() {
-        return uuid;
-    }
-
     /**
      * Returns true iff the obj is another UUID represented by the same two long values.
      */
     @Override
     public boolean equals(Object obj) {
-        return this.toJavaUUID().equals(uuid);
+        return uuid.equals(obj);
     }
 
     /**
@@ -109,7 +105,6 @@ public class UUID {
         ByteBuffer uuidBytes = ByteBuffer.wrap(Base64.getUrlDecoder().decode(str));
         return new UUID(uuidBytes.getLong(), uuidBytes.getLong());
     }
-
 
     private byte[] getBytesFromUuid(java.util.UUID uuid) {
         // Extract bytes for uuid which is 128 bits (or 16 bytes) long.
