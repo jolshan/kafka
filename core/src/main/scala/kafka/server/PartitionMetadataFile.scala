@@ -38,7 +38,7 @@ object PartitionMetadataFile {
 
   object PartitionMetadataFileFormatter {
     def toFile(data: PartitionMetadata): String = {
-      s"version: ${data.version}\ntopic_iD: ${data.topicId}"
+      s"version: ${data.version}\ntopic_id: ${data.topicId}"
     }
 
   }

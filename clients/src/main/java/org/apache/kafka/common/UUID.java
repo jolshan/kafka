@@ -32,7 +32,7 @@ public class UUID {
     /**
      * A UUID that represents a null or empty UUID. Will never be returned by the randomUUID method
      */
-    public static final UUID ZERO_UUID = new UUID(new java.util.UUID(0L,0L));
+    public static final UUID ZERO_UUID = new UUID(new java.util.UUID(0L, 0L));
     private static final java.util.UUID ZERO_ID_INTERNAL = new java.util.UUID(0L, 0L);
 
     private final java.util.UUID uuid;
@@ -95,7 +95,7 @@ public class UUID {
     /**
      * Returns a hash code for this UUID
      */
-    public int hashCode(){
+    public int hashCode() {
         return uuid.hashCode();
     }
 
