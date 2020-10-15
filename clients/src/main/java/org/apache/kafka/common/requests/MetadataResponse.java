@@ -16,10 +16,7 @@
  */
 package org.apache.kafka.common.requests;
 
-import org.apache.kafka.common.Cluster;
-import org.apache.kafka.common.Node;
-import org.apache.kafka.common.PartitionInfo;
-import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.*;
 import org.apache.kafka.common.message.MetadataResponseData;
 import org.apache.kafka.common.message.MetadataResponseData.MetadataResponseBroker;
 import org.apache.kafka.common.message.MetadataResponseData.MetadataResponsePartition;
@@ -248,17 +245,20 @@ public class MetadataResponse extends AbstractResponse {
     public static class TopicMetadata {
         private final Errors error;
         private final String topic;
+        private final UUID topicId;
         private final boolean isInternal;
         private final List<PartitionMetadata> partitionMetadata;
         private int authorizedOperations;
 
         public TopicMetadata(Errors error,
                              String topic,
+                             UUID topicId,
                              boolean isInternal,
                              List<PartitionMetadata> partitionMetadata,
                              int authorizedOperations) {
             this.error = error;
             this.topic = topic;
+            this.topicId = topicId;
             this.isInternal = isInternal;
             this.partitionMetadata = partitionMetadata;
             this.authorizedOperations = authorizedOperations;
@@ -266,9 +266,10 @@ public class MetadataResponse extends AbstractResponse {
 
         public TopicMetadata(Errors error,
                              String topic,
+                             UUID topicId,
                              boolean isInternal,
                              List<PartitionMetadata> partitionMetadata) {
-            this(error, topic, isInternal, partitionMetadata, AUTHORIZED_OPERATIONS_OMITTED);
+            this(error, topic, topicId, isInternal, partitionMetadata, AUTHORIZED_OPERATIONS_OMITTED);
         }
 
         public Errors error() {
@@ -277,6 +278,10 @@ public class MetadataResponse extends AbstractResponse {
 
         public String topic() {
             return topic;
+        }
+
+        public UUID topidId() {
+            return topicId;
         }
 
         public boolean isInternal() {
@@ -303,13 +308,14 @@ public class MetadataResponse extends AbstractResponse {
             return isInternal == that.isInternal &&
                 error == that.error &&
                 Objects.equals(topic, that.topic) &&
+                Objects.equals(topicId, that.topicId) &&
                 Objects.equals(partitionMetadata, that.partitionMetadata) &&
                 Objects.equals(authorizedOperations, that.authorizedOperations);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(error, topic, isInternal, partitionMetadata, authorizedOperations);
+            return Objects.hash(error, topic, topicId, isInternal, partitionMetadata, authorizedOperations);
         }
 
         @Override
@@ -317,6 +323,7 @@ public class MetadataResponse extends AbstractResponse {
             return "TopicMetadata{" +
                 "error=" + error +
                 ", topic='" + topic + '\'' +
+                ", topicId=" + topicId +
                 ", isInternal=" + isInternal +
                 ", partitionMetadata=" + partitionMetadata +
                 ", authorizedOperations=" + authorizedOperations +
@@ -402,6 +409,7 @@ public class MetadataResponse extends AbstractResponse {
             for (MetadataResponseTopic topicMetadata : data.topics()) {
                 Errors topicError = Errors.forCode(topicMetadata.errorCode());
                 String topic = topicMetadata.name();
+                UUID topicId = topicMetadata.topicID();
                 boolean isInternal = topicMetadata.isInternal();
                 List<PartitionMetadata> partitionMetadataList = new ArrayList<>();
 
@@ -419,7 +427,7 @@ public class MetadataResponse extends AbstractResponse {
                             partitionMetadata.offlineReplicas()));
                 }
 
-                topicMetadataList.add(new TopicMetadata(topicError, topic, isInternal, partitionMetadataList,
+                topicMetadataList.add(new TopicMetadata(topicError, topic, topicId, isInternal, partitionMetadataList,
                         topicMetadata.topicAuthorizedOperations()));
             }
             return topicMetadataList;
@@ -450,6 +458,7 @@ public class MetadataResponse extends AbstractResponse {
             metadataResponseTopic
                 .setErrorCode(topicMetadata.error.code())
                 .setName(topicMetadata.topic)
+                .setTopicID(topicMetadata.topicId)
                 .setIsInternal(topicMetadata.isInternal)
                 .setTopicAuthorizedOperations(topicMetadata.authorizedOperations);
 

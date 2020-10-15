@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.common.requests;
 
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.message.MetadataRequestData;
 import org.apache.kafka.common.message.MetadataRequestData.MetadataRequestTopic;
@@ -44,13 +45,13 @@ public class MetadataRequest extends AbstractRequest {
         }
 
         public Builder(List<String> topics, boolean allowAutoTopicCreation, short allowedVersion) {
-            this(topics, allowAutoTopicCreation, allowedVersion, allowedVersion);
+            this(topics, null, allowAutoTopicCreation, allowedVersion, allowedVersion);
         }
 
-        public Builder(List<String> topics, boolean allowAutoTopicCreation, short minVersion, short maxVersion) {
+        public Builder(List<String> topics, List<UUID> topicIds, boolean allowAutoTopicCreation, short minVersion, short maxVersion) {
             super(ApiKeys.METADATA, minVersion, maxVersion);
             MetadataRequestData data = new MetadataRequestData();
-            if (topics == null)
+            if (topics == null && topicIds == null)
                 data.setTopics(null);
             else {
                 topics.forEach(topic -> data.topics().add(new MetadataRequestTopic().setName(topic)));
@@ -61,7 +62,7 @@ public class MetadataRequest extends AbstractRequest {
         }
 
         public Builder(List<String> topics, boolean allowAutoTopicCreation) {
-            this(topics, allowAutoTopicCreation, ApiKeys.METADATA.oldestVersion(),  ApiKeys.METADATA.latestVersion());
+            this(topics, null, allowAutoTopicCreation, ApiKeys.METADATA.oldestVersion(),  ApiKeys.METADATA.latestVersion());
         }
 
         public static Builder allTopics() {
@@ -124,13 +125,25 @@ public class MetadataRequest extends AbstractRequest {
     public AbstractResponse getErrorResponse(int throttleTimeMs, Throwable e) {
         Errors error = Errors.forException(e);
         MetadataResponseData responseData = new MetadataResponseData();
-        if (topics() != null) {
-            for (String topic :topics())
-                responseData.topics().add(new MetadataResponseData.MetadataResponseTopic()
-                    .setName(topic)
-                    .setErrorCode(error.code())
-                    .setIsInternal(false)
-                    .setPartitions(Collections.emptyList()));
+        if (version >= 7) {
+            if (topics() != null || topicIds() != null) {
+                for (MetadataRequestTopic topic : data.topics())
+                    responseData.topics().add(new MetadataResponseData.MetadataResponseTopic()
+                            .setName(topic.name())
+                            .setTopicID(topic.topicID())
+                            .setErrorCode(error.code())
+                            .setIsInternal(false)
+                            .setPartitions(Collections.emptyList()));
+            }
+        } else {
+            if (topics() != null) {
+                for (String topic : topics())
+                    responseData.topics().add(new MetadataResponseData.MetadataResponseTopic()
+                            .setName(topic)
+                            .setErrorCode(error.code())
+                            .setIsInternal(false)
+                            .setPartitions(Collections.emptyList()));
+            }
         }
 
         responseData.setThrottleTimeMs(throttleTimeMs);
@@ -151,6 +164,16 @@ public class MetadataRequest extends AbstractRequest {
                 .stream()
                 .map(MetadataRequestTopic::name)
                 .collect(Collectors.toList());
+    }
+
+    public List<UUID> topicIds() {
+        if (isAllTopics()) //In version 0, we return null for empty topic list
+            return null;
+        else
+            return data.topics()
+                    .stream()
+                    .map(MetadataRequestTopic::topicID)
+                    .collect(Collectors.toList());
     }
 
     public boolean allowAutoTopicCreation() {

@@ -17,7 +17,7 @@
   "apiKey": 3,
   "type": "request",
   "name": "MetadataRequest",
-  "validVersions": "0-9",
+  "validVersions": "0-10",
   "flexibleVersions": "9+",
   "fields": [
     // In version 0, an empty array indicates "request metadata for all topics."  In version 1 and
@@ -33,8 +33,9 @@
     // Version 9 is the first flexible version.
     { "name": "Topics", "type": "[]MetadataRequestTopic", "versions": "0+", "nullableVersions": "1+",
       "about": "The topics to fetch metadata for.", "fields": [
-      { "name": "Name", "type": "string", "versions": "0+", "entityType": "topicName",
-        "about": "The topic name." }
+      { "name": "Name", "type": "string", "versions": "0+", "nullableVersions": "10+", "entityType": "topicName",
+        "about": "The topic name." },
+      {"name": "TopicID", "type": "uuid", "versions": "10+", "about": "The unique topic identifier"}
     ]},
     { "name": "AllowAutoTopicCreation", "type": "bool", "versions": "4+", "default": "true", "ignorable": false,
       "about": "If this is true, the broker may auto-create topics that we requested which do not already exist, if it is configured to do so." },
