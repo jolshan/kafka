@@ -40,6 +40,7 @@ import org.apache.kafka.common.MetricNameTemplate;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.apache.kafka.common.errors.SerializationException;
@@ -2019,6 +2020,7 @@ public class FetcherTest {
             MetadataResponse.TopicMetadata alteredTopic = new MetadataResponse.TopicMetadata(
                 item.error(),
                 item.topic(),
+                item.topicId(),
                 item.isInternal(),
                 altPartitions
             );
@@ -4463,8 +4465,8 @@ public class FetcherTest {
             });
         }
 
-        MetadataResponse.TopicMetadata topicMetadata = new MetadataResponse.TopicMetadata(error, topic, false,
-                partitionsMetadata);
+        MetadataResponse.TopicMetadata topicMetadata = new MetadataResponse.TopicMetadata(error, topic, UUID.randomUUID(),
+                false, partitionsMetadata);
         List<Node> brokers = new ArrayList<>(initialUpdateResponse.brokers());
         return MetadataResponse.prepareResponse(brokers, initialUpdateResponse.clusterId(),
                 initialUpdateResponse.controller().id(), Collections.singletonList(topicMetadata));

@@ -41,6 +41,7 @@ import kafka.network.RequestChannel.SendResponse
 import kafka.server.QuotaFactory.QuotaManagers
 import kafka.utils.{MockTime, TestUtils}
 import kafka.zk.KafkaZkClient
+import org.apache.kafka.common.UUID
 import org.apache.kafka.common.acl.AclOperation
 import org.apache.kafka.common.config.ConfigResource
 import org.apache.kafka.common.{IsolationLevel, Node, TopicPartition}
@@ -2189,7 +2190,7 @@ class KafkaApisTest {
             .setListener(plaintextListener.value)).asJava)
     )
     val updateMetadataRequest = new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, 0,
-      0, 0, Seq.empty[UpdateMetadataPartitionState].asJava, brokers.asJava).build()
+      0, 0, Seq.empty[UpdateMetadataPartitionState].asJava, Map.empty[String,UUID].asJava, brokers.asJava).build()
     metadataCache.updateMetadata(correlationId = 0, updateMetadataRequest)
     (plaintextListener, anotherListener)
   }
@@ -2311,7 +2312,7 @@ class KafkaApisTest {
         .setListener(plaintextListener.value)).asJava)
     val partitionStates = (0 until numPartitions).map(createPartitionState)
     new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, 0,
-      0, brokerEpoch, partitionStates.asJava, Seq(broker).asJava).build()
+      0, brokerEpoch, partitionStates.asJava, Collections.singletonMap(topic,UUID.randomUUID()), Seq(broker).asJava).build()
   }
 
   private def setupBasicMetadataCache(topic: String, numPartitions: Int): Unit = {

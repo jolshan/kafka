@@ -1257,6 +1257,13 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
     }
 
+    if (request.header.apiVersion >= 10) {
+      // add topic IDs
+      topicMetadata.foreach { topicData =>
+        topicData.setTopicID(metadataCache.getTopicId(topicData.name))
+      }
+    }
+
     val completeTopicMetadata = topicMetadata ++ unauthorizedForCreateTopicMetadata ++ unauthorizedForDescribeTopicMetadata
 
     val brokers = metadataCache.getAliveBrokers

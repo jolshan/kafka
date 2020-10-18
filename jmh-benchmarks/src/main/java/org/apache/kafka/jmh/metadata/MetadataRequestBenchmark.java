@@ -35,6 +35,7 @@ import kafka.server.QuotaFactory;
 import kafka.server.ReplicaManager;
 import kafka.server.ReplicationQuotaManager;
 import kafka.zk.KafkaZkClient;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.memory.MemoryPool;
 import org.apache.kafka.common.message.UpdateMetadataRequestData.UpdateMetadataBroker;
 import org.apache.kafka.common.message.UpdateMetadataRequestData.UpdateMetadataEndpoint;
@@ -69,6 +70,7 @@ import scala.Option;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -122,6 +124,7 @@ public class MetadataRequestBenchmark {
     private void initializeMetadataCache() {
         List<UpdateMetadataBroker> liveBrokers = new LinkedList<>();
         List<UpdateMetadataPartitionState> partitionStates = new LinkedList<>();
+        HashMap<String, UUID> topicIds = new HashMap<>();
 
         IntStream.range(0, 5).forEach(brokerId -> liveBrokers.add(
             new UpdateMetadataBroker().setId(brokerId)
@@ -130,6 +133,7 @@ public class MetadataRequestBenchmark {
 
         IntStream.range(0, topicCount).forEach(topicId -> {
             String topicName = "topic-" + topicId;
+            topicIds.put(topicName, UUID.randomUUID());
 
             IntStream.range(0, partitionCount).forEach(partitionId -> {
                 partitionStates.add(
@@ -147,7 +151,7 @@ public class MetadataRequestBenchmark {
         UpdateMetadataRequest updateMetadataRequest = new UpdateMetadataRequest.Builder(
             ApiKeys.UPDATE_METADATA.latestVersion(),
             1, 1, 1,
-            partitionStates, liveBrokers).build();
+            partitionStates, topicIds, liveBrokers).build();
         metadataCache.updateMetadata(100, updateMetadataRequest);
     }
 

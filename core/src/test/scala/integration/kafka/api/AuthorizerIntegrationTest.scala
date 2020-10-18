@@ -54,7 +54,7 @@ import org.apache.kafka.common.resource.PatternType.LITERAL
 import org.apache.kafka.common.resource.ResourceType._
 import org.apache.kafka.common.resource.{PatternType, Resource, ResourcePattern, ResourcePatternFilter, ResourceType}
 import org.apache.kafka.common.security.auth.{AuthenticationContext, KafkaPrincipal, KafkaPrincipalBuilder, SecurityProtocol}
-import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition, requests}
+import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition, requests, UUID}
 import org.apache.kafka.test.{TestUtils => JTestUtils}
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
@@ -104,6 +104,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
   val correlationId = 0
   val clientId = "client-Id"
   val tp = new TopicPartition(topic, part)
+  val topicIds = Collections.singletonMap(topic, UUID.randomUUID())
   val logDir = "logDir"
   val group = "my-group"
   val protocolType = "consumer"
@@ -356,7 +357,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
         .setSecurityProtocol(securityProtocol.id)
         .setListener(ListenerName.forSecurityProtocol(securityProtocol).value)).asJava)).asJava
     val version = ApiKeys.UPDATE_METADATA.latestVersion
-    new requests.UpdateMetadataRequest.Builder(version, brokerId, Int.MaxValue, Long.MaxValue, partitionStates, brokers).build()
+    new requests.UpdateMetadataRequest.Builder(version, brokerId, Int.MaxValue, Long.MaxValue, partitionStates, topicIds, brokers).build()
   }
 
   private def createJoinGroupRequest = {

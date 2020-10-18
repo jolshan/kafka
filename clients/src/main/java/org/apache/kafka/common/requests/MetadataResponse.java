@@ -16,7 +16,11 @@
  */
 package org.apache.kafka.common.requests;
 
-import org.apache.kafka.common.*;
+import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.message.MetadataResponseData;
 import org.apache.kafka.common.message.MetadataResponseData.MetadataResponseBroker;
 import org.apache.kafka.common.message.MetadataResponseData.MetadataResponsePartition;
@@ -280,7 +284,7 @@ public class MetadataResponse extends AbstractResponse {
             return topic;
         }
 
-        public UUID topidId() {
+        public UUID topicId() {
             return topicId;
         }
 
@@ -458,9 +462,11 @@ public class MetadataResponse extends AbstractResponse {
             metadataResponseTopic
                 .setErrorCode(topicMetadata.error.code())
                 .setName(topicMetadata.topic)
-                .setTopicID(topicMetadata.topicId)
                 .setIsInternal(topicMetadata.isInternal)
                 .setTopicAuthorizedOperations(topicMetadata.authorizedOperations);
+
+            if (responseVersion >= 10)
+                metadataResponseTopic.setTopicID(topicMetadata.topicId);
 
             for (PartitionMetadata partitionMetadata : topicMetadata.partitionMetadata) {
                 metadataResponseTopic.partitions().add(new MetadataResponsePartition()

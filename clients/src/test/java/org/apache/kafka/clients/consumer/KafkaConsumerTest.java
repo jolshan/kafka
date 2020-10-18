@@ -37,6 +37,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
@@ -2374,7 +2375,7 @@ public class KafkaConsumerTest {
 
         List<MetadataResponse.TopicMetadata> topicMetadata = new ArrayList<>();
         topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.INVALID_TOPIC_EXCEPTION,
-                invalidTopicName, false, Collections.emptyList()));
+                invalidTopicName, UUID.ZERO_UUID, false, Collections.emptyList()));
         MetadataResponse updateResponse = MetadataResponse.prepareResponse(cluster.nodes(),
                 cluster.clusterResource().clusterId(),
                 cluster.controller().id(),

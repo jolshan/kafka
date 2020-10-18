@@ -21,6 +21,7 @@ import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.IsolationLevel;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AccessControlEntryFilter;
 import org.apache.kafka.common.acl.AclBinding;
@@ -274,11 +275,11 @@ public class RequestResponseTest {
         checkRequest(MetadataRequest.Builder.allTopics().build((short) 2), true);
         checkRequest(createMetadataRequest(1, Collections.singletonList("topic1")), true);
         checkErrorResponse(createMetadataRequest(1, Collections.singletonList("topic1")), unknownServerException, true);
-        checkResponse(createMetadataResponse(), 2, true);
+        checkResponse(createMetadataResponse((short) 2), 2, true);
         checkErrorResponse(createMetadataRequest(2, Collections.singletonList("topic1")), unknownServerException, true);
-        checkResponse(createMetadataResponse(), 3, true);
+        checkResponse(createMetadataResponse((short) 3), 3, true);
         checkErrorResponse(createMetadataRequest(3, Collections.singletonList("topic1")), unknownServerException, true);
-        checkResponse(createMetadataResponse(), 4, true);
+        checkResponse(createMetadataResponse((short) 4), 4, true);
         checkErrorResponse(createMetadataRequest(4, Collections.singletonList("topic1")), unknownServerException, true);
         checkRequest(createOffsetFetchRequestForAllPartition("group1", false), true);
         checkRequest(createOffsetFetchRequestForAllPartition("group1", true), true);
@@ -373,8 +374,8 @@ public class RequestResponseTest {
         checkErrorResponse(createWriteTxnMarkersRequest(), unknownServerException, true);
 
         checkOlderFetchVersions();
-        checkResponse(createMetadataResponse(), 0, true);
-        checkResponse(createMetadataResponse(), 1, true);
+        checkResponse(createMetadataResponse((short) 0), 0, true);
+        checkResponse(createMetadataResponse((short) 1), 1, true);
         checkErrorResponse(createMetadataRequest(1, Collections.singletonList("topic1")), unknownServerException, true);
         checkRequest(createOffsetCommitRequest(0), true);
         checkErrorResponse(createOffsetCommitRequest(0), unknownServerException, true);
@@ -1310,25 +1311,25 @@ public class RequestResponseTest {
         return new MetadataRequest.Builder(topics, true).build((short) version);
     }
 
-    private MetadataResponse createMetadataResponse() {
+    private MetadataResponse createMetadataResponse(short version) {
         Node node = new Node(1, "host1", 1001);
         List<Integer> replicas = singletonList(node.id());
         List<Integer> isr = singletonList(node.id());
         List<Integer> offlineReplicas = emptyList();
 
         List<MetadataResponse.TopicMetadata> allTopicMetadata = new ArrayList<>();
-        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, "__consumer_offsets", true,
+        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, "__consumer_offsets", UUID.randomUUID(), true,
                 asList(new MetadataResponse.PartitionMetadata(Errors.NONE,
                         new TopicPartition("__consumer_offsets", 1),
                         Optional.of(node.id()), Optional.of(5), replicas, isr, offlineReplicas))));
-        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.LEADER_NOT_AVAILABLE, "topic2", false,
+        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.LEADER_NOT_AVAILABLE, "topic2", UUID.randomUUID(), false,
                 emptyList()));
-        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, "topic3", false,
+        allTopicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, "topic3", UUID.randomUUID(), false,
             asList(new MetadataResponse.PartitionMetadata(Errors.LEADER_NOT_AVAILABLE,
                     new TopicPartition("topic3", 0), Optional.empty(),
                     Optional.empty(), replicas, isr, offlineReplicas))));
 
-        return MetadataResponse.prepareResponse(asList(node), null, MetadataResponse.NO_CONTROLLER_ID, allTopicMetadata);
+        return MetadataResponse.prepareResponse(asList(node), null, MetadataResponse.NO_CONTROLLER_ID, allTopicMetadata, version);
     }
 
     private OffsetCommitRequest createOffsetCommitRequest(int version) {
@@ -1569,6 +1570,10 @@ public class RequestResponseTest {
                 .setReplicas(replicas)
                 .setOfflineReplicas(offlineReplicas));
 
+        HashMap<String, UUID> topicIds = new HashMap<>();
+        topicIds.put("topic5", UUID.randomUUID());
+        topicIds.put("topic20", UUID.randomUUID());
+
         SecurityProtocol plaintext = SecurityProtocol.PLAINTEXT;
         List<UpdateMetadataEndpoint> endpoints1 = new ArrayList<>();
         endpoints1.add(new UpdateMetadataEndpoint()
@@ -1609,7 +1614,7 @@ public class RequestResponseTest {
                 .setRack(rack)
         );
         return new UpdateMetadataRequest.Builder((short) version, 1, 10, 0, partitionStates,
-            liveBrokers).build();
+            topicIds, liveBrokers).build();
     }
 
     private UpdateMetadataResponse createUpdateMetadataResponse() {

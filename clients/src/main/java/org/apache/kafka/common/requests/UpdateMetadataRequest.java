@@ -34,6 +34,7 @@ import org.apache.kafka.common.utils.Utils;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,6 +209,13 @@ public class UpdateMetadataRequest extends AbstractControlRequest {
                 topicState -> topicState.partitionStates().iterator());
         }
         return data.ungroupedPartitionStates();
+    }
+
+    public Iterable<UpdateMetadataTopicState> topicStates() {
+        if (version() >= 5) {
+            return () -> data.topicStates().iterator();
+        }
+        return () -> Collections.emptyIterator();
     }
 
     public List<UpdateMetadataBroker> liveBrokers() {

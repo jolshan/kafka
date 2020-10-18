@@ -23,6 +23,7 @@ import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.internals.Topic;
 import org.apache.kafka.common.network.NetworkReceive;
 import org.apache.kafka.common.protocol.ApiKeys;
@@ -54,7 +55,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -185,13 +185,15 @@ public class TestUtils {
                         replicaIds, replicaIds, replicaIds));
             }
 
-            topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, topic,
+            UUID topicId = (responseVersion > 10) ? UUID.ZERO_UUID : UUID.randomUUID();
+
+            topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, topic, topicId,
                     Topic.isInternal(topic), partitionMetadata));
         }
 
         for (Map.Entry<String, Errors> topicErrorEntry : topicErrors.entrySet()) {
             String topic = topicErrorEntry.getKey();
-            topicMetadata.add(new MetadataResponse.TopicMetadata(topicErrorEntry.getValue(), topic,
+            topicMetadata.add(new MetadataResponse.TopicMetadata(topicErrorEntry.getValue(), topic, UUID.ZERO_UUID,
                     Topic.isInternal(topic), Collections.emptyList()));
         }
 

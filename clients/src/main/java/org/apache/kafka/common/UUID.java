@@ -79,7 +79,11 @@ public class UUID {
      */
     @Override
     public boolean equals(Object obj) {
-        return uuid.equals(obj);
+        if ((null == obj) || (obj.getClass() != this.getClass()))
+            return false;
+        UUID id = (UUID) obj;
+        return this.getMostSignificantBits() == id.getMostSignificantBits() &&
+                this.getLeastSignificantBits() == id.getLeastSignificantBits();
     }
 
     /**

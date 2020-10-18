@@ -361,7 +361,6 @@ public final class FieldSpec {
         } else if (type instanceof FieldType.UUIDFieldType) {
             headerGenerator.addImport(MessageGenerator.UUID_CLASS);
             if (fieldDefault.isEmpty()) {
-                headerGenerator.addImport(MessageGenerator.MESSAGE_UTIL_CLASS);
                 return "UUID.ZERO_UUID";
             } else {
                 try {

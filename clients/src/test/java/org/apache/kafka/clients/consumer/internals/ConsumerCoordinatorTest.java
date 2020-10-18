@@ -32,6 +32,7 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.DisconnectException;
@@ -1593,7 +1594,7 @@ public class ConsumerCoordinatorTest {
                         Optional.of(node.id()), Optional.empty(), singletonList(node.id()), singletonList(node.id()),
                         singletonList(node.id()));
             MetadataResponse.TopicMetadata topicMetadata = new MetadataResponse.TopicMetadata(Errors.NONE,
-                Topic.GROUP_METADATA_TOPIC_NAME, true, singletonList(partitionMetadata));
+                Topic.GROUP_METADATA_TOPIC_NAME, UUID.randomUUID(), true, singletonList(partitionMetadata));
 
             client.updateMetadata(MetadataResponse.prepareResponse(singletonList(node), "clusterId", node.id(),
                 singletonList(topicMetadata)));

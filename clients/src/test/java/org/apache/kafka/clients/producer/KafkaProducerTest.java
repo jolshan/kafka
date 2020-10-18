@@ -31,6 +31,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -1086,7 +1087,7 @@ public class KafkaProducerTest {
 
         List<MetadataResponse.TopicMetadata> topicMetadata = new ArrayList<>();
         topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.INVALID_TOPIC_EXCEPTION,
-                invalidTopicName, false, Collections.emptyList()));
+                invalidTopicName, UUID.ZERO_UUID, false, Collections.emptyList()));
         MetadataResponse updateResponse =  MetadataResponse.prepareResponse(
                 new ArrayList<>(initialUpdateResponse.brokers()),
                 initialUpdateResponse.clusterId(),

@@ -44,7 +44,7 @@ import org.apache.kafka.common.requests._
 import org.apache.kafka.common.resource.{PatternType, ResourceType => AdminResourceType}
 import org.apache.kafka.common.security.auth.{AuthenticationContext, KafkaPrincipal, KafkaPrincipalBuilder, SecurityProtocol}
 import org.apache.kafka.common.utils.{Sanitizer, SecurityUtils}
-import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition}
+import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition, UUID}
 import org.apache.kafka.server.authorizer.{Action, AuthorizableRequestContext, AuthorizationResult}
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
@@ -59,6 +59,7 @@ class RequestQuotaTest extends BaseRequestTest {
   private val topic = "topic-1"
   private val numPartitions = 1
   private val tp = new TopicPartition(topic, 0)
+  private val topicIds = Map("topic-1" -> UUID.randomUUID())
   private val logDir = "logDir"
   private val unthrottledClientId = "unthrottled-client"
   private val smallQuotaProducerClientId = "small-quota-producer-client"
@@ -275,7 +276,8 @@ class RequestQuotaTest extends BaseRequestTest {
               .setPort(0)
               .setSecurityProtocol(securityProtocol.id)
               .setListener(ListenerName.forSecurityProtocol(securityProtocol).value)).asJava)).asJava
-          new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, brokerId, Int.MaxValue, Long.MaxValue, partitionState, brokers)
+          new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, brokerId, Int.MaxValue, Long.MaxValue,
+            partitionState, topicIds.asJava, brokers)
 
         case ApiKeys.CONTROLLED_SHUTDOWN =>
           new ControlledShutdownRequest.Builder(

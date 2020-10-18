@@ -19,6 +19,7 @@ package org.apache.kafka.clients.consumer.internals;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.MetadataRequest;
@@ -71,9 +72,9 @@ public class ConsumerMetadataTest {
         assertTrue(builder.isAllTopics());
 
         List<MetadataResponse.TopicMetadata> topics = new ArrayList<>();
-        topics.add(topicMetadata("__consumer_offsets", true));
-        topics.add(topicMetadata("__matching_topic", false));
-        topics.add(topicMetadata("non_matching_topic", false));
+        topics.add(topicMetadata("__consumer_offsets", UUID.randomUUID(), true));
+        topics.add(topicMetadata("__matching_topic", UUID.randomUUID(), false));
+        topics.add(topicMetadata("non_matching_topic", UUID.randomUUID(), false));
 
         MetadataResponse response = MetadataResponse.prepareResponse(singletonList(node),
             "clusterId", node.id(), topics);
@@ -147,9 +148,9 @@ public class ConsumerMetadataTest {
 
         List<MetadataResponse.TopicMetadata> topics = new ArrayList<>();
         for (String expectedTopic : expectedTopics)
-            topics.add(topicMetadata(expectedTopic, false));
+            topics.add(topicMetadata(expectedTopic, UUID.randomUUID(), false));
         for (String expectedInternalTopic : expectedInternalTopics)
-            topics.add(topicMetadata(expectedInternalTopic, true));
+            topics.add(topicMetadata(expectedInternalTopic, UUID.randomUUID(), true));
 
         MetadataResponse response = MetadataResponse.prepareResponse(singletonList(node),
             "clusterId", node.id(), topics);
@@ -158,11 +159,11 @@ public class ConsumerMetadataTest {
         assertEquals(allTopics, metadata.fetch().topics());
     }
 
-    private MetadataResponse.TopicMetadata topicMetadata(String topic, boolean isInternal) {
+    private MetadataResponse.TopicMetadata topicMetadata(String topic, UUID topicId, boolean isInternal) {
         MetadataResponse.PartitionMetadata partitionMetadata = new MetadataResponse.PartitionMetadata(Errors.NONE,
                 new TopicPartition(topic, 0), Optional.of(node.id()), Optional.of(5),
                 singletonList(node.id()), singletonList(node.id()), singletonList(node.id()));
-        return new MetadataResponse.TopicMetadata(Errors.NONE, topic, isInternal, singletonList(partitionMetadata));
+        return new MetadataResponse.TopicMetadata(Errors.NONE, topic, topicId, isInternal, singletonList(partitionMetadata));
     }
 
     private ConsumerMetadata newConsumerMetadata(boolean includeInternalTopics) {

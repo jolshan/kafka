@@ -35,6 +35,7 @@ import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.UUID;
 import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AccessControlEntryFilter;
 import org.apache.kafka.common.acl.AclBinding;
@@ -999,7 +1000,7 @@ public class KafkaAdminClientTest {
                     singletonList(leader.id()), singletonList(leader.id()), singletonList(leader.id()));
             env.kafkaClient().prepareResponse(MetadataResponse.prepareResponse(initializedCluster.nodes(),
                     initializedCluster.clusterResource().clusterId(), 1,
-                    singletonList(new MetadataResponse.TopicMetadata(Errors.NONE, topic, false,
+                    singletonList(new MetadataResponse.TopicMetadata(Errors.NONE, topic, UUID.randomUUID(), false,
                             singletonList(partitionMetadata), MetadataResponse.AUTHORIZED_OPERATIONS_OMITTED))));
 
             DescribeTopicsResult result = env.adminClient().describeTopics(Collections.singleton(topic));
@@ -1786,7 +1787,7 @@ public class KafkaAdminClientTest {
 
         try (AdminClientUnitTestEnv env = mockClientEnv()) {
             List<MetadataResponse.TopicMetadata> topics = new ArrayList<>();
-            topics.add(new MetadataResponse.TopicMetadata(Errors.TOPIC_AUTHORIZATION_FAILED, topic, false,
+            topics.add(new MetadataResponse.TopicMetadata(Errors.TOPIC_AUTHORIZATION_FAILED, topic, UUID.ZERO_UUID, false,
                     Collections.emptyList()));
 
             env.kafkaClient().prepareResponse(MetadataResponse.prepareResponse(env.cluster().nodes(),
@@ -1820,7 +1821,7 @@ public class KafkaAdminClientTest {
                     singletonList(nodes.get(1).id()), Collections.emptyList()));
 
             List<MetadataResponse.TopicMetadata> topicMetadata = new ArrayList<>();
-            topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, topic, false, partitionMetadata));
+            topicMetadata.add(new MetadataResponse.TopicMetadata(Errors.NONE, topic, UUID.randomUUID(), false, partitionMetadata));
 
             env.kafkaClient().prepareResponse(MetadataResponse.prepareResponse(env.cluster().nodes(),
                     env.cluster().clusterResource().clusterId(), env.cluster().controller().id(), topicMetadata));
@@ -1908,7 +1909,7 @@ public class KafkaAdminClientTest {
                     Optional.of(nodes.get(0).id()), Optional.of(5), singletonList(nodes.get(0).id()),
                     singletonList(nodes.get(0).id()), Collections.emptyList()));
 
-            t.add(new MetadataResponse.TopicMetadata(Errors.NONE, "my_topic", false, p));
+            t.add(new MetadataResponse.TopicMetadata(Errors.NONE, "my_topic", UUID.randomUUID(), false, p));
 
             env.kafkaClient().prepareResponse(MetadataResponse.prepareResponse(cluster.nodes(), cluster.clusterResource().clusterId(), cluster.controller().id(), t));
             env.kafkaClient().prepareResponse(new DeleteRecordsResponse(m));
