@@ -2803,21 +2803,46 @@ class LogTest {
   }
 
   @Test
-  def testWriteLeaderEpochCheckpointAndPartitionMetadataAfterDirectoryRename(): Unit = {
+  def testWriteLeaderEpochCheckpointAfterDirectoryRename(): Unit = {
     val logConfig = LogTest.createLogConfig(segmentBytes = 1000, indexIntervalBytes = 1, maxMessageBytes = 64 * 1024)
     val log = createLog(logDir, logConfig)
     log.appendAsLeader(TestUtils.records(List(new SimpleRecord("foo".getBytes()))), leaderEpoch = 5)
     assertEquals(Some(5), log.latestEpoch)
 
-    // Ensure that after a directory rename, the epoch cache and partition metadata are written to the right location
+    // Ensure that after a directory rename, the epoch cache is written to the right location
     val tp = Log.parseTopicPartitionName(log.dir)
     log.renameDir(Log.logDeleteDirName(tp))
     log.appendAsLeader(TestUtils.records(List(new SimpleRecord("foo".getBytes()))), leaderEpoch = 10)
     assertEquals(Some(10), log.latestEpoch)
     assertTrue(LeaderEpochCheckpointFile.newFile(log.dir).exists())
     assertFalse(LeaderEpochCheckpointFile.newFile(this.logDir).exists())
+  }
+
+  @Test
+  def testTopicIdTransfersAfterDirectoryRename(): Unit = {
+    val logConfig = LogTest.createLogConfig(segmentBytes = 1000, indexIntervalBytes = 1, maxMessageBytes = 64 * 1024)
+    val log = createLog(logDir, logConfig)
+
+    // Write a topic ID to the partition metadata file to ensure it is transferred correctly.
+    val id = UUID.randomUUID()
+    log.topicID = id
+    log.partitionMetadataFile.get.write(id)
+
+    log.appendAsLeader(TestUtils.records(List(new SimpleRecord("foo".getBytes()))), leaderEpoch = 5)
+    assertEquals(Some(5), log.latestEpoch)
+
+    // Ensure that after a directory rename, the partition metadata file is written to the right location.
+    val tp = Log.parseTopicPartitionName(log.dir)
+    log.renameDir(Log.logDeleteDirName(tp))
+    log.appendAsLeader(TestUtils.records(List(new SimpleRecord("foo".getBytes()))), leaderEpoch = 10)
+    assertEquals(Some(10), log.latestEpoch)
     assertTrue(PartitionMetadataFile.newFile(log.dir).exists())
     assertFalse(PartitionMetadataFile.newFile(this.logDir).exists())
+
+    // Check the topic ID remains in memory and was copied correctly.
+    assertEquals(id, log.topicID)
+    assertTrue(!log.partitionMetadataFile.isEmpty)
+    assertEquals(id, log.partitionMetadataFile.get.read().topicId)
   }
 
   @Test

@@ -1454,14 +1454,14 @@ class ReplicaManager(val config: KafkaConfig,
                 val log = localLog(topicPartition).get
                 // Check if the topic ID is in memory, if not, it must be new to the broker.
                 // If the broker previously wrote it to file, it would be recovered on restart after failure.
-                if (!log.topicID.equals(MessageUtil.ZERO_UUID)) {
-                  // Check if topic ID in request matches the topic ID in memory.
-                  if (!log.topicID.equals(topicIds.get(topicPartition.topic))) {
-                    stateChangeLogger.warn(s"Topic Id in memory: ${log.topicID.toString} does not" +
-                      s" match the topic Id provided in the request: " +
-                      s"${topicIds.get(topicPartition.topic).toString}.")
-                  }
+                // If the topic ID is not the default (ZERO_UUID), a topic ID is being used for the given topic.
+                // If the topic ID in the log does not match the one in the request, the broker's topic must be stale.
+                if (!log.topicID.equals(MessageUtil.ZERO_UUID) && !log.topicID.equals(topicIds.get(topicPartition.topic))) {
+                  stateChangeLogger.warn(s"Topic Id in memory: ${log.topicID.toString} does not" +
+                    s" match the topic Id provided in the request: " +
+                    s"${topicIds.get(topicPartition.topic).toString}.")
                 } else {
+                  // There is not yet a topic ID stored in the log.
                   // Write the partition metadata file if it is empty.
                   if (log.partitionMetadataFile.get.isEmpty()) {
                     log.partitionMetadataFile.get.write(topicIds.get(topicPartition.topic))
@@ -1483,8 +1483,7 @@ class ReplicaManager(val config: KafkaConfig,
           replicaFetcherManager.shutdownIdleFetcherThreads()
           replicaAlterLogDirsManager.shutdownIdleFetcherThreads()
           onLeadershipChange(partitionsBecomeLeader, partitionsBecomeFollower)
-          val version = leaderAndIsrRequest.version()
-          if (version < 4) {
+          if (leaderAndIsrRequest.version() < 4) {
             val responsePartitions = responseMap.iterator.map { case (tp, error) =>
               new LeaderAndIsrPartitionError()
                 .setTopicName(tp.topic)

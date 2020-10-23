@@ -2220,7 +2220,6 @@ class ReplicaManagerTest {
       val id = topicIds.get(topicPartition.topic())
       val log = replicaManager.localLog(topicPartition).get
       assertTrue(!log.partitionMetadataFile.isEmpty)
-      assertTrue(!log.partitionMetadataFile.get.notExists())
       assertTrue(!log.partitionMetadataFile.get.isEmpty())
       val partitionMetadata = log.partitionMetadataFile.get.read()
 
@@ -2260,7 +2259,6 @@ class ReplicaManagerTest {
       assertTrue(!replicaManager.localLog(topicPartition).isEmpty)
       val log = replicaManager.localLog(topicPartition).get
       assertTrue(!log.partitionMetadataFile.isEmpty)
-      assertTrue(!log.partitionMetadataFile.get.notExists())
       assertTrue(log.partitionMetadataFile.get.isEmpty())
 
       // The file has no contents if the topic has the default UUID.
@@ -2268,7 +2266,6 @@ class ReplicaManagerTest {
       assertTrue(!replicaManager.localLog(topicPartition).isEmpty)
       val log2 = replicaManager.localLog(topicPartition).get
       assertTrue(!log2.partitionMetadataFile.isEmpty)
-      assertTrue(!log2.partitionMetadataFile.get.notExists())
       assertTrue(log2.partitionMetadataFile.get.isEmpty())
     } finally replicaManager.shutdown(checkpointHW = false)
   }
