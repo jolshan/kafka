@@ -195,8 +195,11 @@ public class UpdateMetadataRequestTest {
             assertEquals(liveBrokers, deserializedRequest.liveBrokers());
             assertEquals(1, request.controllerId());
             assertEquals(2, request.controllerEpoch());
-            assertEquals(3, request.brokerEpoch());
-
+            // Broker epoch is only supported from version 5
+            if (version >= 5)
+                assertEquals(3, deserializedRequest.brokerEpoch());
+            else
+                assertEquals(-1, deserializedRequest.brokerEpoch());
             // Since there are no topicIds states prior to version 7, the topicIds map contains all ZERO_UUID
             for (UpdateMetadataTopicState ts : request.topicStates()) {
                 if (version < 7)
