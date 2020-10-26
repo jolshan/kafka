@@ -455,7 +455,7 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
 
   private def sendLeaderAndIsrRequest(controllerEpoch: Int, stateChangeLog: StateChangeLogger): Unit = {
     val leaderAndIsrRequestVersion: Short =
-      if (config.interBrokerProtocolVersion >= KAFKA_2_7_IV0) 5
+      if (config.interBrokerProtocolVersion >= KAFKA_2_7_IV2) 5
       else if (config.interBrokerProtocolVersion >= KAFKA_2_4_IV1) 4
       else if (config.interBrokerProtocolVersion >= KAFKA_2_4_IV0) 3
       else if (config.interBrokerProtocolVersion >= KAFKA_2_2_IV0) 2

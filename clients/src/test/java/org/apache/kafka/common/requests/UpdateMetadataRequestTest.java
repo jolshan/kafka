@@ -201,11 +201,14 @@ public class UpdateMetadataRequestTest {
             else
                 assertEquals(-1, deserializedRequest.brokerEpoch());
             // Since there are no topicIds states prior to version 7, the topicIds map contains all ZERO_UUID
-            for (UpdateMetadataTopicState ts : request.topicStates()) {
-                if (version < 7)
-                   assertEquals(ts.topicID(), UUID.ZERO_UUID);
-                else
+            if (version < 7) {
+                for (UpdateMetadataTopicState ts : request.topicStates()) {
+                    assertEquals(ts.topicID(), UUID.ZERO_UUID);
+                }
+            } else {
+                for (UpdateMetadataTopicState ts : request.topicStates()) {
                     assertEquals(ts.topicID(), topicIds.get(ts.topicName()));
+                }
             }
         }
     }
