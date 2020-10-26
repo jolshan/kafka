@@ -16,7 +16,7 @@ package kafka.server
 
 import java.util
 import java.util.concurrent.{Executors, Future, TimeUnit}
-import java.util.{Collections, Optional, Properties, UUID}
+import java.util.{Collections, Optional, Properties}
 
 import kafka.api.LeaderAndIsr
 import kafka.log.LogConfig
@@ -44,7 +44,7 @@ import org.apache.kafka.common.requests._
 import org.apache.kafka.common.resource.{PatternType, ResourceType => AdminResourceType}
 import org.apache.kafka.common.security.auth.{AuthenticationContext, KafkaPrincipal, KafkaPrincipalBuilder, SecurityProtocol}
 import org.apache.kafka.common.utils.{Sanitizer, SecurityUtils}
-import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition}
+import org.apache.kafka.common.{ElectionType, IsolationLevel, Node, TopicPartition, UUID}
 import org.apache.kafka.server.authorizer.{Action, AuthorizableRequestContext, AuthorizationResult}
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
@@ -57,9 +57,9 @@ class RequestQuotaTest extends BaseRequestTest {
   override def brokerCount: Int = 1
 
   private val topic = "topic-1"
-  private val topicIds = Collections.singletonMap(topic, UUID.randomUUID())
   private val numPartitions = 1
   private val tp = new TopicPartition(topic, 0)
+  private val topicIds = Map("topic-1" -> UUID.randomUUID())
   private val logDir = "logDir"
   private val unthrottledClientId = "unthrottled-client"
   private val smallQuotaProducerClientId = "small-quota-producer-client"
@@ -244,7 +244,6 @@ class RequestQuotaTest extends BaseRequestTest {
               .setZkVersion(2)
               .setReplicas(Seq(brokerId).asJava)
               .setIsNew(true)).asJava,
-            topicIds,
             Set(new Node(brokerId, "localhost", 0)).asJava)
 
         case ApiKeys.STOP_REPLICA =>
@@ -277,7 +276,8 @@ class RequestQuotaTest extends BaseRequestTest {
               .setPort(0)
               .setSecurityProtocol(securityProtocol.id)
               .setListener(ListenerName.forSecurityProtocol(securityProtocol).value)).asJava)).asJava
-          new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, brokerId, Int.MaxValue, Long.MaxValue, partitionState, brokers)
+          new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, brokerId, Int.MaxValue, Long.MaxValue,
+            partitionState, topicIds.asJava, brokers)
 
         case ApiKeys.CONTROLLED_SHUTDOWN =>
           new ControlledShutdownRequest.Builder(
@@ -583,9 +583,6 @@ class RequestQuotaTest extends BaseRequestTest {
 
         case ApiKeys.ALTER_ISR =>
           new AlterIsrRequest.Builder(new AlterIsrRequestData())
-
-        case ApiKeys.UPDATE_FEATURES =>
-          new UpdateFeaturesRequest.Builder(new UpdateFeaturesRequestData())
 
         case _ =>
           throw new IllegalArgumentException("Unsupported API key " + apiKey)
