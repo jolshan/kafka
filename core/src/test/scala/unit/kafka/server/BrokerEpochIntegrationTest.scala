@@ -17,6 +17,8 @@
 
 package kafka.server
 
+import java.util.Collections
+
 import kafka.api.LeaderAndIsr
 import kafka.cluster.Broker
 import kafka.controller.{ControllerChannelManager, ControllerContext, StateChangeLogger}
@@ -35,8 +37,6 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.utils.Time
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
-
-import java.util.Collections
 
 import scala.jdk.CollectionConverters._
 

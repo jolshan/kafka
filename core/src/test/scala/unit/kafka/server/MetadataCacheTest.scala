@@ -141,7 +141,9 @@ class MetadataCacheTest {
       }
 
       checkTopicMetadata(topic0)
+      assertEquals(cache.getTopicId(topic0), topicIds(topic0))
       checkTopicMetadata(topic1)
+      assertEquals(cache.getTopicId(topic1), topicIds(topic1))
     }
 
   }
@@ -240,6 +242,8 @@ class MetadataCacheTest {
     val topicMetadata = topicMetadatas.head
     assertEquals(Errors.NONE.code, topicMetadata.errorCode)
 
+    assertEquals(cache.getTopicId(topic), topicIds(topic))
+
     val partitionMetadatas = topicMetadata.partitions
     assertEquals(1, partitionMetadatas.size)
 
@@ -298,6 +302,8 @@ class MetadataCacheTest {
 
     val topicMetadata = topicMetadatas.head
     assertEquals(Errors.NONE.code(), topicMetadata.errorCode)
+
+    assertEquals(cache.getTopicId(topic), topicIds(topic))
 
     val partitionMetadatas = topicMetadata.partitions
     assertEquals(1, partitionMetadatas.size)
@@ -373,6 +379,8 @@ class MetadataCacheTest {
 
     val topicMetadata = topicMetadatas.head
     assertEquals(Errors.NONE.code(), topicMetadata.errorCode)
+
+    assertEquals(cache.getTopicId(topic), topicIds(topic))
 
     val partitionMetadatas = topicMetadata.partitions
     assertEquals(1, partitionMetadatas.size)
@@ -483,6 +491,7 @@ class MetadataCacheTest {
     // This should not change `aliveBrokersFromCache`
     updateCache((0 to 3))
     assertEquals(initialBrokerIds.toSet, aliveBrokersFromCache.map(_.id).toSet)
+    assertEquals(cache.getTopicId(topic), topicIds(topic))
   }
 
 }

@@ -285,7 +285,7 @@ class MetadataCache(brokerId: Int) extends Logging {
   }
 
   def getTopicId(topic: String): UUID = {
-    topicIds.get(topic).get
+    topicIds(topic)
   }
 
   // This method returns the deleted TopicPartitions received from UpdateMetadataRequest

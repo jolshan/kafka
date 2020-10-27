@@ -140,8 +140,7 @@ class KafkaApisTest {
       time,
       null,
       brokerFeatures,
-      cache
-    )
+      cache)
   }
 
   @Test
