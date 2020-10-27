@@ -37,7 +37,7 @@ import org.apache.kafka.common.requests._
 import org.apache.kafka.common.security.JaasContext
 import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.utils.{LogContext, Time}
-import org.apache.kafka.common.{KafkaException, Node, Reconfigurable, TopicPartition, UUID}
+import org.apache.kafka.common.{KafkaException, Node, Reconfigurable, TopicPartition}
 
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable.HashMap
@@ -539,15 +539,15 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
         .setEndpoints(endpoints.asJava)
         .setRack(broker.rack.orNull)
     }.toBuffer
-
     updateMetadataRequestBrokerSet.intersect(controllerContext.liveOrShuttingDownBrokerIds).foreach { broker =>
       val brokerEpoch = controllerContext.liveBrokerIdAndEpochs(broker)
-      // Remove this later
-      val topics = partitionStates.map( partitionState => partitionState.topicName()).toSet
-      val topicIds = topics.map( name => (name, UUID.ZERO_UUID)).toMap.asJava
-      // Remove this later
+      val topicIds = updateMetadataRequestPartitionInfoMap.keys
+        .map(_.topic)
+        .toSet
+        .map((topic: String) => (topic, controllerContext.topicIds(topic)))
+        .toMap
       val updateMetadataRequestBuilder = new UpdateMetadataRequest.Builder(updateMetadataRequestVersion,
-        controllerId, controllerEpoch, brokerEpoch, partitionStates.asJava, topicIds, liveBrokers.asJava)
+        controllerId, controllerEpoch, brokerEpoch, partitionStates.asJava, topicIds.asJava, liveBrokers.asJava)
       sendRequest(broker, updateMetadataRequestBuilder, (r: AbstractResponse) => {
         val updateMetadataResponse = r.asInstanceOf[UpdateMetadataResponse]
         sendEvent(UpdateMetadataResponseReceived(updateMetadataResponse, broker))
