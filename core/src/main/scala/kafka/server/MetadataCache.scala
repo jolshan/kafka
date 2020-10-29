@@ -53,6 +53,7 @@ class MetadataCache(brokerId: Int) extends Logging {
   @volatile private var metadataSnapshot: MetadataSnapshot = MetadataSnapshot(partitionStates = mutable.AnyRefMap.empty,
     controllerId = None, aliveBrokers = mutable.LongMap.empty, aliveNodes = mutable.LongMap.empty)
   private val topicIds = mutable.Map.empty[String,UUID]
+  private val topicNames = mutable.Map.empty[UUID, String]
 
   this.logIdent = s"[MetadataCache brokerId=$brokerId] "
   private val stateChangeLogger = new StateChangeLogger(brokerId, inControllerContext = false, None)
@@ -358,6 +359,7 @@ class MetadataCache(brokerId: Int) extends Logging {
         // Update topicIds by adding the ids from the request
         updateMetadataRequest.topicStates.forEach { topicState =>
           topicIds.put(topicState.topicName(), topicState.topicID())
+          topicNames.put(topicState.topicID(), topicState.topicName())
           stateChangeLogger.trace(s"Added topic id ${topicState.topicID()} for topic ${topicState.topicName()} " +
             s"in response to UpdateMetadata request sent by controller $controllerId epoch $controllerEpoch with " +
             s"correlation id $correlationId")
@@ -366,8 +368,8 @@ class MetadataCache(brokerId: Int) extends Logging {
         // Remove topic IDs associated with deletedPartitions
         val deletedTopics = deletedPartitions.map(tp => tp.topic()).toSet
         deletedTopics.foreach{ case topic =>
-          val id = topicIds.get(topic)
-          topicIds.remove(topic)
+          val id = topicIds.remove(topic).get
+          topicNames.remove(id)
           stateChangeLogger.trace(s"Removed topic id $id for topic $topic in response to UpdateMetadata " +
             s"request sent by controller $controllerId epoch $controllerEpoch with correlation id $correlationId")
         }
