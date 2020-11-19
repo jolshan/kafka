@@ -96,7 +96,7 @@
               files="RequestResponseTest.java|FetcherTest.java|KafkaAdminClientTest.java"/>
 
     <suppress checks="NPathComplexity"
-              files="MemoryRecordsTest|MetricsTest|TestSslUtils|UpdateMetadataRequestTest.java"/>
+              files="MemoryRecordsTest|MetricsTest|TestSslUtils"/>
 
     <suppress checks="(WhitespaceAround|LocalVariableName|ImportControl|AvoidStarImport)"
               files="Murmur3Test.java"/>

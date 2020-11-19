@@ -505,8 +505,7 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
 
     val partitionStates = updateMetadataRequestPartitionInfoMap.values.toBuffer
     val updateMetadataRequestVersion: Short =
-      if (config.interBrokerProtocolVersion >= KAFKA_2_8_IV0) 7
-      else if (config.interBrokerProtocolVersion >= KAFKA_2_4_IV1) 6
+      if (config.interBrokerProtocolVersion >= KAFKA_2_4_IV1) 6
       else if (config.interBrokerProtocolVersion >= KAFKA_2_2_IV0) 5
       else if (config.interBrokerProtocolVersion >= KAFKA_1_0_IV0) 4
       else if (config.interBrokerProtocolVersion >= KAFKA_0_10_2_IV0) 3
@@ -539,15 +538,11 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
         .setEndpoints(endpoints.asJava)
         .setRack(broker.rack.orNull)
     }.toBuffer
+
     updateMetadataRequestBrokerSet.intersect(controllerContext.liveOrShuttingDownBrokerIds).foreach { broker =>
       val brokerEpoch = controllerContext.liveBrokerIdAndEpochs(broker)
-      val topicIds = updateMetadataRequestPartitionInfoMap.keys
-        .map(_.topic)
-        .toSet
-        .map((topic: String) => (topic, controllerContext.topicIds(topic)))
-        .toMap
       val updateMetadataRequestBuilder = new UpdateMetadataRequest.Builder(updateMetadataRequestVersion,
-        controllerId, controllerEpoch, brokerEpoch, partitionStates.asJava, topicIds.asJava, liveBrokers.asJava)
+        controllerId, controllerEpoch, brokerEpoch, partitionStates.asJava, liveBrokers.asJava)
       sendRequest(broker, updateMetadataRequestBuilder, (r: AbstractResponse) => {
         val updateMetadataResponse = r.asInstanceOf[UpdateMetadataResponse]
         sendEvent(UpdateMetadataResponseReceived(updateMetadataResponse, broker))

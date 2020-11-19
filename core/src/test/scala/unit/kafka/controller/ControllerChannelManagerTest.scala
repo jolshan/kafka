@@ -91,9 +91,9 @@ class ControllerChannelManagerTest {
     assertEquals(2, brokerId)
     assertEquals(partitions.keySet,
       leaderAndIsrResponse.topics.asScala.map(t => t.partitionErrors.asScala.map(p =>
-        new TopicPartition(topicNames.get(t.topicID).get, p.partitionIndex))).flatMap(f => f).toSet)
+        new TopicPartition(topicNames.get(t.topicId).get, p.partitionIndex))).flatMap(f => f).toSet)
     leaderAndIsrResponse.topics.forEach(topic =>
-      assertEquals(topicIds.get(topicNames.get(topic.topicID).get), topic.topicID))
+      assertEquals(topicIds.get(topicNames.get(topic.topicId).get), topic.topicId))
   }
 
   @Test
@@ -341,8 +341,7 @@ class ControllerChannelManagerTest {
 
     for (apiVersion <- ApiVersion.allVersions) {
       val updateMetadataRequestVersion: Short =
-        if (apiVersion >= KAFKA_2_8_IV0) 7
-        else if (apiVersion >= KAFKA_2_4_IV1) 6
+        if (apiVersion >= KAFKA_2_4_IV1) 6
         else if (apiVersion >= KAFKA_2_2_IV0) 5
         else if (apiVersion >= KAFKA_1_0_IV0) 4
         else if (apiVersion >= KAFKA_0_10_2_IV0) 3
@@ -829,7 +828,7 @@ class ControllerChannelManagerTest {
       val topicIds = leaderAndIsrRequest.topicIds()
       val topicErrors = leaderAndIsrRequest.data.topicStates().asScala.map(t =>
         new LeaderAndIsrTopicError()
-          .setTopicID(topicIds.get(t.topicName))
+          .setTopicId(topicIds.get(t.topicName))
           .setPartitionErrors(t.partitionStates().asScala.map(p =>
             new LeaderAndIsrPartitionError()
               .setPartitionIndex(p.partitionIndex())
