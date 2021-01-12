@@ -288,10 +288,10 @@ public class Fetcher<K, V> implements Closeable {
                                 return;
                             }
 
-                            Set<TopicPartition> partitions = new HashSet<>(response.responseData().keySet());
+                            Set<TopicPartition> partitions = new HashSet<>(response.responseData(Collections.emptyMap()).keySet());
                             FetchResponseMetricAggregator metricAggregator = new FetchResponseMetricAggregator(sensors, partitions);
 
-                            for (Map.Entry<TopicPartition, FetchResponse.PartitionData<Records>> entry : response.responseData().entrySet()) {
+                            for (Map.Entry<TopicPartition, FetchResponse.PartitionData<Records>> entry : response.responseData(Collections.emptyMap()).entrySet()) {
                                 TopicPartition partition = entry.getKey();
                                 FetchRequest.PartitionData requestData = data.sessionPartitions().get(partition);
                                 if (requestData == null) {

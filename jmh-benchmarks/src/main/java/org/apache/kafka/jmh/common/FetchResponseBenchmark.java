@@ -18,6 +18,7 @@
 package org.apache.kafka.jmh.common;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.network.Send;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
@@ -42,10 +43,7 @@ import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -63,6 +61,10 @@ public class FetchResponseBenchmark {
 
     LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> responseData;
 
+    Map<String, Uuid> topicIds;
+
+    LinkedHashMap<Uuid,String> topicNames;
+
     ResponseHeader header;
 
     FetchResponse<MemoryRecords> fetchResponse;
@@ -75,8 +77,13 @@ public class FetchResponseBenchmark {
                 new SimpleRecord(1002, "key3".getBytes(StandardCharsets.UTF_8), "value3".getBytes(StandardCharsets.UTF_8)));
 
         this.responseData = new LinkedHashMap<>();
+        this.topicIds = new HashMap<>();
+        this.topicNames = new LinkedHashMap<>();
         for (int topicIdx = 0; topicIdx < topicCount; topicIdx++) {
             String topic = UUID.randomUUID().toString();
+            Uuid id = Uuid.randomUuid();
+            topicIds.put(topic, id);
+            topicNames.put(id, topic);
             for (int partitionId = 0; partitionId < partitionCount; partitionId++) {
                 FetchResponse.PartitionData<MemoryRecords> partitionData = new FetchResponse.PartitionData<>(
                     Errors.NONE, 0, 0, 0, Optional.empty(), Collections.emptyList(), records);
@@ -85,13 +92,13 @@ public class FetchResponseBenchmark {
         }
 
         this.header = new ResponseHeader(100, ApiKeys.FETCH.responseHeaderVersion(ApiKeys.FETCH.latestVersion()));
-        this.fetchResponse = new FetchResponse<>(Errors.NONE, responseData, 0, 0);
+        this.fetchResponse = new FetchResponse<>(Errors.NONE, responseData, topicNames, 0, 0);
     }
 
     @Benchmark
     public int testConstructFetchResponse() {
-        FetchResponse<MemoryRecords> fetchResponse = new FetchResponse<>(Errors.NONE, responseData, 0, 0);
-        return fetchResponse.responseData().size();
+        FetchResponse<MemoryRecords> fetchResponse = new FetchResponse<>(Errors.NONE, responseData, topicNames, 0, 0);
+        return fetchResponse.responseData(topicNames).size();
     }
 
     @Benchmark

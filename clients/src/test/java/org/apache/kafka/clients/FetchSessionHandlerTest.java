@@ -17,6 +17,7 @@
 package org.apache.kafka.clients;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.FetchRequest;
@@ -52,6 +53,8 @@ public class FetchSessionHandlerTest {
     final public Timeout globalTimeout = Timeout.millis(120000);
 
     private static final LogContext LOG_CONTEXT = new LogContext("[FetchSessionHandler]=");
+
+    private static LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
 
     /**
      * Create a set of TopicPartitions.  We use a TreeSet, in order to get a deterministic
@@ -197,6 +200,7 @@ public class FetchSessionHandlerTest {
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 0, 0),
                     new RespEntry("foo", 1, 0, 0)),
+                topicNames,
             0, INVALID_SESSION_ID);
         handler.handleResponse(resp);
 
@@ -231,7 +235,7 @@ public class FetchSessionHandlerTest {
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20)),
-            0, 123);
+            topicNames, 0, 123);
         handler.handleResponse(resp);
 
         // Test an incremental fetch request which adds one partition and modifies another.
@@ -254,13 +258,13 @@ public class FetchSessionHandlerTest {
 
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 1, 20, 20)),
-            0, 123);
+                topicNames, 0, 123);
         handler.handleResponse(resp2);
 
         // Skip building a new request.  Test that handling an invalid fetch session epoch response results
         // in a request which closes the session.
         FetchResponse<MemoryRecords> resp3 = new FetchResponse<>(Errors.INVALID_FETCH_SESSION_EPOCH, respMap(),
-            0, INVALID_SESSION_ID);
+            topicNames, 0, INVALID_SESSION_ID);
         handler.handleResponse(resp3);
 
         FetchSessionHandler.Builder builder4 = handler.newBuilder();
@@ -319,7 +323,7 @@ public class FetchSessionHandlerTest {
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20),
                     new RespEntry("bar", 0, 10, 20)),
-            0, 123);
+            topicNames, 0, 123);
         handler.handleResponse(resp);
 
         // Test an incremental fetch request which removes two partitions.
@@ -341,7 +345,7 @@ public class FetchSessionHandlerTest {
         // A FETCH_SESSION_ID_NOT_FOUND response triggers us to close the session.
         // The next request is a session establishing FULL request.
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.FETCH_SESSION_ID_NOT_FOUND,
-            respMap(), 0, INVALID_SESSION_ID);
+            respMap(), topicNames, 0, INVALID_SESSION_ID);
         handler.handleResponse(resp2);
         FetchSessionHandler.Builder builder3 = handler.newBuilder();
         builder3.add(new TopicPartition("foo", 0),
@@ -361,7 +365,7 @@ public class FetchSessionHandlerTest {
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID));
         assertTrue(issue.contains("extra"));
         assertFalse(issue.contains("omitted"));
         FetchSessionHandler.Builder builder = handler.newBuilder();
@@ -376,12 +380,12 @@ public class FetchSessionHandlerTest {
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID));
         assertTrue(issue2 == null);
         String issue3 = handler.verifyFullFetchResponsePartitions(new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20)),
-            0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID));
         assertFalse(issue3.contains("extra"));
         assertTrue(issue3.contains("omitted"));
     }

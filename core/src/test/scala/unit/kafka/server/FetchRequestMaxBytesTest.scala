@@ -17,7 +17,7 @@
 
 package kafka.server
 
-import java.util.{Optional, Properties}
+import java.util.{Collections, Optional, Properties}
 
 import kafka.log.LogConfig
 import kafka.utils.TestUtils
@@ -115,7 +115,7 @@ class FetchRequestMaxBytesTest extends BaseRequestTest {
       FetchRequest.Builder.forConsumer(Int.MaxValue, 0,
         Map(testTopicPartition ->
           new PartitionData(fetchOffset, 0, Integer.MAX_VALUE, Optional.empty())).asJava).build(3))
-    val records = response.responseData().get(testTopicPartition).records.records()
+    val records = response.responseData(Collections.emptyMap()).get(testTopicPartition).records.records()
     Assert.assertNotNull(records)
     val recordsList = records.asScala.toList
     Assert.assertEquals(expected.size, recordsList.size)

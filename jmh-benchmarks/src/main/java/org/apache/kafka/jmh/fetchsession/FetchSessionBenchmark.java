@@ -19,6 +19,7 @@ package org.apache.kafka.jmh.fetchsession;
 
 import org.apache.kafka.clients.FetchSessionHandler;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.FetchRequest;
@@ -71,6 +72,7 @@ public class FetchSessionBenchmark {
         FetchSessionHandler.Builder builder = handler.newBuilder();
 
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> respMap = new LinkedHashMap<>();
+        LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
         for (int i = 0; i < partitionCount; i++) {
             TopicPartition tp = new TopicPartition("foo", i);
             FetchRequest.PartitionData partitionData = new FetchRequest.PartitionData(0, 0, 200,
@@ -87,7 +89,7 @@ public class FetchSessionBenchmark {
         }
         builder.build();
         // build and handle an initial response so that the next fetch will be incremental
-        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, 0, 1));
+        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, topicNames, 0, 1));
 
         int counter = 0;
         for (TopicPartition topicPartition: new ArrayList<>(fetches.keySet())) {

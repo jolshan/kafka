@@ -23,7 +23,7 @@ import java.util
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import java.util.regex.{Pattern, PatternSyntaxException}
-import java.util.{Date, Optional, Properties}
+import java.util.{Collections, Date, Optional, Properties}
 
 import joptsimple.OptionParser
 import kafka.api._
@@ -398,8 +398,9 @@ private class ReplicaFetcher(name: String, sourceBroker: Node, topicPartitions: 
       requestMap.put(topicPartition, new JFetchRequest.PartitionData(replicaBuffer.getOffset(topicPartition),
         0L, fetchSize, Optional.empty()))
 
+    // TO DO: PUT GOOD REPLACEMENT FOR EMPTY MAP
     val fetchRequestBuilder = JFetchRequest.Builder.
-      forReplica(ApiKeys.FETCH.latestVersion, Request.DebuggingConsumerId, maxWait, minBytes, requestMap)
+      forReplica(ApiKeys.FETCH.latestVersion, Request.DebuggingConsumerId, maxWait, minBytes, requestMap, Collections.emptyMap)
 
     debug("Issuing fetch request ")
 
@@ -414,7 +415,8 @@ private class ReplicaFetcher(name: String, sourceBroker: Node, topicPartitions: 
     }
 
     if (fetchResponse != null) {
-      fetchResponse.responseData.forEach { (tp, partitionData) =>
+      // REPLACE EMPTY MAP HERE AS WELL.
+      fetchResponse.responseData(Collections.emptyMap()).forEach { (tp, partitionData) =>
         replicaBuffer.addFetchedData(tp, sourceBroker.id, partitionData)
       }
     } else {

@@ -31,7 +31,7 @@ import org.apache.kafka.common.record.Records
 import org.apache.kafka.common.requests.AbstractRequest.Builder
 import org.apache.kafka.common.requests.{AbstractRequest, FetchResponse, OffsetsForLeaderEpochResponse, FetchMetadata => JFetchMetadata}
 import org.apache.kafka.common.utils.{SystemTime, Time}
-import org.apache.kafka.common.{Node, TopicPartition}
+import org.apache.kafka.common.{Node, TopicPartition, Uuid}
 
 import scala.collection.Map
 
@@ -59,6 +59,7 @@ class ReplicaFetcherMockBlockingSend(offsets: java.util.Map[TopicPartition, Epoc
   var callback: Option[() => Unit] = None
   var currentOffsets: util.Map[TopicPartition, EpochEndOffset] = offsets
   var fetchPartitionData: Map[TopicPartition, FetchResponse.PartitionData[Records]] = Map.empty
+  var topicIds: Map[String, Uuid] = Map.empty
   private val sourceNode = new Node(sourceBroker.id, sourceBroker.host, sourceBroker.port)
 
   def setEpochRequestCallback(postEpochFunction: () => Unit): Unit = {
@@ -104,9 +105,12 @@ class ReplicaFetcherMockBlockingSend(offsets: java.util.Map[TopicPartition, Epoc
       case ApiKeys.FETCH =>
         fetchCount += 1
         val partitionData = new util.LinkedHashMap[TopicPartition, FetchResponse.PartitionData[Records]]
+        val topicNames = new util.LinkedHashMap[Uuid, String]
         fetchPartitionData.foreach { case (tp, data) => partitionData.put(tp, data) }
+        topicIds.foreach { case (name, id) => topicNames.put(id, name) }
         fetchPartitionData = Map.empty
-        new FetchResponse(Errors.NONE, partitionData, 0,
+        topicIds = Map.empty
+        new FetchResponse(Errors.NONE, partitionData, topicNames, 0,
           if (partitionData.isEmpty) JFetchMetadata.INVALID_SESSION_ID else 1)
 
       case _ =>

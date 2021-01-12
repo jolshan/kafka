@@ -1969,16 +1969,18 @@ class KafkaApisTest {
 
     EasyMock.replay(replicaManager, clientQuotaManager, clientRequestQuotaManager, requestChannel, fetchManager)
 
-    val fetchRequest = new FetchRequest.Builder(9, 9, -1, 100, 0, fetchData)
+    val fetchRequest = new FetchRequest.Builder(9, 9, -1, 100, 0, fetchData,
+      metadataCache.getTopicIds().asJava)
       .build()
     val request = buildRequest(fetchRequest)
     createKafkaApis().handleFetchRequest(request)
 
     val response = readResponse(fetchRequest, capturedResponse)
       .asInstanceOf[FetchResponse[BaseRecords]]
-    assertTrue(response.responseData.containsKey(tp))
+    val responseData = response.responseData(metadataCache.getTopicNames().asJava)
+    assertTrue(responseData.containsKey(tp))
 
-    val partitionData = response.responseData.get(tp)
+    val partitionData = responseData.get(tp)
     assertEquals(Errors.NONE, partitionData.error)
     assertEquals(hw, partitionData.highWatermark)
     assertEquals(-1, partitionData.lastStableOffset)
@@ -2513,8 +2515,8 @@ class KafkaApisTest {
 
     val fetchData = Collections.singletonMap(tp0, new FetchRequest.PartitionData(0, 0, Int.MaxValue, Optional.of(leaderEpoch)))
     val fetchFromFollower = buildRequest(new FetchRequest.Builder(
-      ApiKeys.FETCH.oldestVersion(), ApiKeys.FETCH.latestVersion(), 1, 1000, 0, fetchData
-    ).build())
+      ApiKeys.FETCH.oldestVersion(), ApiKeys.FETCH.latestVersion(), 1, 1000, 0, fetchData,
+        metadataCache.getTopicIds().asJava).build())
 
     setupBasicMetadataCache(tp0.topic, numPartitions = 1)
     val hw = 3
@@ -3071,6 +3073,7 @@ class KafkaApisTest {
 
   @Test
   def testSizeOfThrottledPartitions(): Unit = {
+    var topicNames = new util.LinkedHashMap[Uuid, String]
     def fetchResponse(data: Map[TopicPartition, String]): FetchResponse[Records] = {
       val responseData = new util.LinkedHashMap[TopicPartition, FetchResponse.PartitionData[Records]](
         data.map { case (tp, raw) =>
@@ -3079,13 +3082,17 @@ class KafkaApisTest {
             MemoryRecords.withRecords(CompressionType.NONE,
               new SimpleRecord(100, raw.getBytes(StandardCharsets.UTF_8))).asInstanceOf[Records])
       }.toMap.asJava)
-      new FetchResponse(Errors.NONE, responseData, 100, 100)
+      topicNames = new util.LinkedHashMap[Uuid, String](
+        data.map { case (tp, _) =>
+        Uuid.randomUuid() -> tp.topic()
+      }.toMap.asJava)
+      new FetchResponse(Errors.NONE, responseData, topicNames, 100, 100)
     }
 
     val throttledPartition = new TopicPartition("throttledData", 0)
     val throttledData = Map(throttledPartition -> "throttledData")
     val expectedSize = FetchResponse.sizeOf(FetchResponseData.HIGHEST_SUPPORTED_VERSION,
-      fetchResponse(throttledData).responseData.entrySet.iterator)
+      fetchResponse(throttledData).responseData(topicNames).entrySet.iterator, topicNames)
 
     val response = fetchResponse(throttledData ++ Map(new TopicPartition("nonThrottledData", 0) -> "nonThrottledData"))
 
@@ -3093,6 +3100,6 @@ class KafkaApisTest {
     Mockito.when(quota.isThrottled(ArgumentMatchers.any(classOf[TopicPartition])))
       .thenAnswer(invocation => throttledPartition == invocation.getArgument(0).asInstanceOf[TopicPartition])
 
-    assertEquals(expectedSize, KafkaApis.sizeOfThrottledPartitions(FetchResponseData.HIGHEST_SUPPORTED_VERSION, response, quota))
+    assertEquals(expectedSize, KafkaApis.sizeOfThrottledPartitions(FetchResponseData.HIGHEST_SUPPORTED_VERSION, response, quota, topicNames))
   }
 }

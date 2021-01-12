@@ -30,7 +30,7 @@ import org.apache.kafka.common.message.OffsetForLeaderEpochResponseData.EpochEnd
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.record.MemoryRecords
 import org.apache.kafka.common.requests.FetchRequest
-import org.apache.kafka.common.{IsolationLevel, TopicPartition}
+import org.apache.kafka.common.{IsolationLevel, TopicPartition, Uuid}
 import org.easymock.EasyMock._
 import org.easymock.{Capture, CaptureType, EasyMock, IExpectationSetters}
 import org.junit.Assert._
@@ -45,6 +45,8 @@ class ReplicaAlterLogDirsThreadTest {
 
   private val t1p0 = new TopicPartition("topic1", 0)
   private val t1p1 = new TopicPartition("topic1", 1)
+  private val topicId = Uuid.randomUuid()
+  private val topicNames = collection.immutable.Map(topicId -> "topic1")
   private val failedPartitions = new FailedPartitions
 
   private def initialFetchState(fetchOffset: Long, leaderEpoch: Int = 1): InitialFetchState = {
@@ -811,6 +813,11 @@ class ReplicaAlterLogDirsThreadTest {
 
     replay(replicaManager, logManager, quotaManager, partition, log)
 
+    expect(replicaManager.metadataCache.getTopicNames()).andStubReturn(topicNames)
+
+    val names = replicaManager.metadataCache.getTopicNames()
+
+
     //Create the fetcher thread
     val endPoint = new BrokerEndPoint(0, "localhost", 1000)
     val leaderEpoch = 1
@@ -836,7 +843,7 @@ class ReplicaAlterLogDirsThreadTest {
     assertFalse(partitionsWithError.nonEmpty)
     val request = fetchRequest.build()
     assertEquals(0, request.minBytes)
-    val fetchInfos = request.fetchData.asScala.toSeq
+    val fetchInfos = request.fetchData(names.asJava).asScala.toSeq
     assertEquals(1, fetchInfos.length)
     assertEquals("Expected fetch request for first partition", t1p0, fetchInfos.head._1)
     assertEquals(150, fetchInfos.head._2.fetchOffset)
@@ -862,6 +869,10 @@ class ReplicaAlterLogDirsThreadTest {
 
     replay(replicaManager, logManager, quotaManager, partition, log, futureLog)
 
+    expect(replicaManager.metadataCache.getTopicNames()).andStubReturn(topicNames)
+
+    val names = replicaManager.metadataCache.getTopicNames()
+
     //Create the fetcher thread
     val endPoint = new BrokerEndPoint(0, "localhost", 1000)
     val leaderEpoch = 1
@@ -886,7 +897,7 @@ class ReplicaAlterLogDirsThreadTest {
     val fetchRequest = fetchRequestOpt.get
     assertFalse(fetchRequest.partitionData.isEmpty)
     assertFalse(partitionsWithError.nonEmpty)
-    val fetchInfos = fetchRequest.fetchRequest.build().fetchData.asScala.toSeq
+    val fetchInfos = fetchRequest.fetchRequest.build().fetchData(names.asJava).asScala.toSeq
     assertEquals(1, fetchInfos.length)
     assertEquals("Expected fetch request for non-truncating partition", t1p0, fetchInfos.head._1)
     assertEquals(150, fetchInfos.head._2.fetchOffset)
@@ -900,7 +911,7 @@ class ReplicaAlterLogDirsThreadTest {
     val fetchRequest2 = fetchRequest2Opt.get
     assertFalse(fetchRequest2.partitionData.isEmpty)
     assertFalse(partitionsWithError2.nonEmpty)
-    val fetchInfos2 = fetchRequest2.fetchRequest.build().fetchData.asScala.toSeq
+    val fetchInfos2 = fetchRequest2.fetchRequest.build().fetchData(names.asJava).asScala.toSeq
     assertEquals(1, fetchInfos2.length)
     assertEquals("Expected fetch request for non-delayed partition", t1p0, fetchInfos2.head._1)
     assertEquals(140, fetchInfos2.head._2.fetchOffset)

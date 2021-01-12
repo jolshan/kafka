@@ -37,6 +37,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.InterruptException;
@@ -101,6 +102,7 @@ import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -150,13 +152,16 @@ import static org.mockito.Mockito.verify;
 
 public class KafkaConsumerTest {
     private final String topic = "test";
+    private final Uuid topicId = Uuid.randomUuid();
     private final TopicPartition tp0 = new TopicPartition(topic, 0);
     private final TopicPartition tp1 = new TopicPartition(topic, 1);
 
     private final String topic2 = "test2";
+    private final Uuid topicId2 = Uuid.randomUuid();
     private final TopicPartition t2p0 = new TopicPartition(topic2, 0);
 
     private final String topic3 = "test3";
+    private final Uuid topicId3 = Uuid.randomUuid();
     private final TopicPartition t3p0 = new TopicPartition(topic3, 0);
 
     private final int sessionTimeoutMs = 10000;
@@ -170,6 +175,16 @@ public class KafkaConsumerTest {
     private final String memberId = "memberId";
     private final String leaderId = "leaderId";
     private final Optional<String> groupInstanceId = Optional.of("mock-instance");
+    private Map<String, Uuid> topicIds = Stream.of(
+            new AbstractMap.SimpleEntry<>(topic, topicId),
+            new AbstractMap.SimpleEntry<>(topic2, topicId2),
+            new AbstractMap.SimpleEntry<>(topic3, topicId3))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    private Map<Uuid, String> topicNames = Stream.of(
+            new AbstractMap.SimpleEntry<>(topicId, topic),
+            new AbstractMap.SimpleEntry<>(topicId2, topic2),
+            new AbstractMap.SimpleEntry<>(topicId3, topic3))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     private final String partitionRevoked = "Hit partition revoke ";
     private final String partitionAssigned = "Hit partition assign ";
@@ -619,8 +634,8 @@ public class KafkaConsumerTest {
         client.prepareResponse(
             body -> {
                 FetchRequest request = (FetchRequest) body;
-                return request.fetchData().keySet().equals(singleton(tp0)) &&
-                        request.fetchData().get(tp0).fetchOffset == 50L;
+                return request.fetchData(Collections.emptyMap()).keySet().equals(singleton(tp0)) &&
+                        request.fetchData(Collections.emptyMap()).get(tp0).fetchOffset == 50L;
 
             }, fetchResponse(tp0, 50L, 5));
 
@@ -1659,7 +1674,7 @@ public class KafkaConsumerTest {
         client.prepareResponseFrom(syncGroupResponse(singletonList(tp0), Errors.NONE), coordinator);
 
         client.prepareResponseFrom(body -> body instanceof FetchRequest 
-            && ((FetchRequest) body).fetchData().containsKey(tp0), fetchResponse(tp0, 1, 1), node);
+            && ((FetchRequest) body).fetchData(Collections.emptyMap()).containsKey(tp0), fetchResponse(tp0, 1, 1), node);
         time.sleep(heartbeatIntervalMs);
         Thread.sleep(heartbeatIntervalMs);
         consumer.updateAssignmentMetadataIfNeeded(time.timer(Long.MAX_VALUE));
@@ -2233,6 +2248,7 @@ public class KafkaConsumerTest {
 
     private FetchResponse<MemoryRecords> fetchResponse(Map<TopicPartition, FetchInfo> fetches) {
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> tpResponses = new LinkedHashMap<>();
+        LinkedHashMap<Uuid, String> inOrderTopicNames = new LinkedHashMap<>();
         for (Map.Entry<TopicPartition, FetchInfo> fetchEntry : fetches.entrySet()) {
             TopicPartition partition = fetchEntry.getKey();
             long fetchOffset = fetchEntry.getValue().offset;
@@ -2250,8 +2266,10 @@ public class KafkaConsumerTest {
             tpResponses.put(partition, new FetchResponse.PartitionData<>(
                     Errors.NONE, 0, FetchResponse.INVALID_LAST_STABLE_OFFSET,
                     0L, null, records));
+            inOrderTopicNames.putIfAbsent(topicIds.get(partition.topic()), partition.topic());
         }
-        return new FetchResponse<>(Errors.NONE, tpResponses, 0, INVALID_SESSION_ID);
+        return new FetchResponse<>(Errors.NONE, tpResponses, inOrderTopicNames,
+                0, INVALID_SESSION_ID);
     }
 
     private FetchResponse<MemoryRecords> fetchResponse(TopicPartition partition, long fetchOffset, int count) {

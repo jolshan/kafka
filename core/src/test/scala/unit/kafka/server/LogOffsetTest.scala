@@ -19,7 +19,7 @@ package kafka.server
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.{Optional, Properties, Random}
+import java.util.{Collections, Optional, Properties, Random}
 
 import kafka.log.{ClientRecordDeletion, Log, LogSegment}
 import kafka.utils.{MockTime, TestUtils}
@@ -127,7 +127,7 @@ class LogOffsetTest extends BaseRequestTest {
       Map(topicPartition -> new FetchRequest.PartitionData(consumerOffsets.head, FetchRequest.INVALID_LOG_START_OFFSET,
         300 * 1024, Optional.empty())).asJava).build()
     val fetchResponse = sendFetchRequest(fetchRequest)
-    assertFalse(fetchResponse.responseData.get(topicPartition).records.batches.iterator.hasNext)
+    assertFalse(fetchResponse.responseData(Collections.emptyMap).get(topicPartition).records.batches.iterator.hasNext)
   }
 
   @Test

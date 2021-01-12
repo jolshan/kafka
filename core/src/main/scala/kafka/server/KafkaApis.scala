@@ -80,7 +80,7 @@ import org.apache.kafka.common.resource.{PatternType, Resource, ResourcePattern,
 import org.apache.kafka.common.security.auth.{KafkaPrincipal, SecurityProtocol}
 import org.apache.kafka.common.security.token.delegation.{DelegationToken, TokenInformation}
 import org.apache.kafka.common.utils.{ProducerIdAndEpoch, Time, Utils}
-import org.apache.kafka.common.{Node, TopicPartition}
+import org.apache.kafka.common.{Node, TopicPartition, Uuid}
 import org.apache.kafka.common.message.AlterConfigsResponseData.AlterConfigsResourceResponse
 import org.apache.kafka.common.message.MetadataResponseData.{MetadataResponsePartition, MetadataResponseTopic}
 import org.apache.kafka.server.authorizer._
@@ -709,11 +709,14 @@ class KafkaApis(val requestChannel: RequestChannel,
     val versionId = request.header.apiVersion
     val clientId = request.header.clientId
     val fetchRequest = request.body[FetchRequest]
+    val topicNames = metadataCache.getTopicNames().asJava
     val fetchContext = fetchManager.newContext(
       fetchRequest.metadata,
-      fetchRequest.fetchData,
-      fetchRequest.toForget,
+      fetchRequest.fetchData(topicNames),
+      fetchRequest.toForget(topicNames),
       fetchRequest.isFromFollower)
+    val inOrderTopicNames = new util.LinkedHashMap[Uuid, String]
+
 
     val clientMetadata: Option[ClientMetadata] = if (versionId >= 11) {
       // Fetch API version 11 added preferred replica logic
@@ -730,6 +733,20 @@ class KafkaApis(val requestChannel: RequestChannel,
     def errorResponse[T >: MemoryRecords <: BaseRecords](error: Errors): FetchResponse.PartitionData[T] = {
       new FetchResponse.PartitionData[T](error, FetchResponse.INVALID_HIGHWATERMARK, FetchResponse.INVALID_LAST_STABLE_OFFSET,
         FetchResponse.INVALID_LOG_START_OFFSET, null, MemoryRecords.EMPTY)
+    }
+
+    // Collect errors for topic IDs that can not be found.
+    //val topicErrors = mutable.ArrayBuffer[(Uuid, FetchResponse.PartitionData[BaseRecords])]()
+
+    if (fetchRequest.version() >= 13) {
+      fetchRequest.data().topics().forEach { topic =>
+        val name = topicNames.get(topic.topicId())
+        //if (name == null) {
+          // CHANGE TO UNKNOWN TOPIC ID ONCE ADDED
+        //  topicErrors += topic.topicId() -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
+        //}
+        inOrderTopicNames.put(topic.topicId(), name)
+      }
     }
 
     val erroneous = mutable.ArrayBuffer[(TopicPartition, FetchResponse.PartitionData[Records])]()
@@ -868,7 +885,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       def createResponse(throttleTimeMs: Int): FetchResponse[BaseRecords] = {
         // Down-convert messages for each partition if required
         val convertedData = new util.LinkedHashMap[TopicPartition, FetchResponse.PartitionData[BaseRecords]]
-        unconvertedFetchResponse.responseData.forEach { (tp, unconvertedPartitionData) =>
+        unconvertedFetchResponse.responseData(topicNames).forEach { (tp, unconvertedPartitionData) =>
           if (unconvertedPartitionData.error != Errors.NONE)
             debug(s"Fetch request with correlation id ${request.header.correlationId} from client $clientId " +
               s"on partition $tp failed due to ${unconvertedPartitionData.error.exceptionName}")
@@ -876,10 +893,10 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
 
         // Prepare fetch response from converted data
-        val response = new FetchResponse(unconvertedFetchResponse.error, convertedData, throttleTimeMs,
+        val response = new FetchResponse(unconvertedFetchResponse.error, convertedData, inOrderTopicNames, throttleTimeMs,
           unconvertedFetchResponse.sessionId)
         // record the bytes out metrics only when the response is being sent
-        response.responseData.forEach { (tp, data) =>
+        response.responseData(topicNames).forEach { (tp, data) =>
           brokerTopicStats.updateBytesOut(tp.topic, fetchRequest.isFromFollower, reassigningPartitions.contains(tp), data.records.sizeInBytes)
         }
         response
@@ -898,9 +915,9 @@ class KafkaApis(val requestChannel: RequestChannel,
       if (fetchRequest.isFromFollower) {
         // We've already evaluated against the quota and are good to go. Just need to record it now.
         unconvertedFetchResponse = fetchContext.updateAndGenerateResponseData(partitions)
-        val responseSize = KafkaApis.sizeOfThrottledPartitions(versionId, unconvertedFetchResponse, quotas.leader)
+        val responseSize = KafkaApis.sizeOfThrottledPartitions(versionId, unconvertedFetchResponse, quotas.leader, inOrderTopicNames)
         quotas.leader.record(responseSize)
-        trace(s"Sending Fetch response with partitions.size=${unconvertedFetchResponse.responseData.size}, " +
+        trace(s"Sending Fetch response with partitions.size=${unconvertedFetchResponse.responseData(topicNames).size}, " +
           s"metadata=${unconvertedFetchResponse.sessionId}")
         sendResponseExemptThrottle(request, createResponse(0), Some(updateConversionStats))
       } else {
@@ -911,7 +928,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         // Record both bandwidth and request quota-specific values and throttle by muting the channel if any of the
         // quotas have been violated. If both quotas have been violated, use the max throttle time between the two
         // quotas. When throttled, we unrecord the recorded bandwidth quota value
-        val responseSize = fetchContext.getResponseSize(partitions, versionId)
+        val responseSize = fetchContext.getResponseSize(partitions, versionId, inOrderTopicNames)
         val timeMs = time.milliseconds()
         val requestThrottleTimeMs = quotas.request.maybeRecordAndGetThrottleTimeMs(request, timeMs)
         val bandwidthThrottleTimeMs = quotas.fetch.maybeRecordAndGetThrottleTimeMs(request, responseSize, timeMs)
@@ -3505,8 +3522,9 @@ object KafkaApis {
   // traffic doesn't exceed quota.
   private[server] def sizeOfThrottledPartitions(versionId: Short,
                                                 unconvertedResponse: FetchResponse[Records],
-                                                quota: ReplicationQuotaManager): Int = {
-    FetchResponse.sizeOf(versionId, unconvertedResponse.responseData.entrySet
-      .iterator.asScala.filter(element => quota.isThrottled(element.getKey)).asJava)
+                                                quota: ReplicationQuotaManager,
+                                                inOrderTopicNames: util.LinkedHashMap[Uuid, String]): Int = {
+    FetchResponse.sizeOf(versionId, unconvertedResponse.responseData(inOrderTopicNames).entrySet
+      .iterator.asScala.filter(element => quota.isThrottled(element.getKey)).asJava, inOrderTopicNames)
   }
 }

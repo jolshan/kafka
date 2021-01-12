@@ -17,6 +17,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.message.FetchResponseData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
@@ -27,6 +28,7 @@ import org.apache.kafka.common.record.MemoryRecords;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -270,25 +272,33 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
      */
     public FetchResponse(Errors error,
                          LinkedHashMap<TopicPartition, PartitionData<T>> responseData,
+                         LinkedHashMap<Uuid, String> inOrderTopicNames,
                          int throttleTimeMs,
                          int sessionId) {
         super(ApiKeys.FETCH);
-        this.data = toMessage(throttleTimeMs, error, responseData.entrySet().iterator(), sessionId);
+        this.data = toMessage(throttleTimeMs, error, responseData.entrySet().iterator(), inOrderTopicNames, sessionId);
         this.responseDataMap = responseData;
     }
 
     public FetchResponse(FetchResponseData fetchResponseData) {
         super(ApiKeys.FETCH);
         this.data = fetchResponseData;
-        this.responseDataMap = toResponseDataMap(fetchResponseData);
+        if (!supportsTopicIds()) {
+            this.responseDataMap = toResponseDataMap(fetchResponseData);
+        } else {
+            this.responseDataMap = null;
+        }
     }
 
     public Errors error() {
         return Errors.forCode(data.errorCode());
     }
 
-    public LinkedHashMap<TopicPartition, PartitionData<T>> responseData() {
-        return responseDataMap;
+    public LinkedHashMap<TopicPartition, PartitionData<T>> responseData(Map<Uuid, String> topicNames) {
+        if (!supportsTopicIds())
+            return responseDataMap;
+        return toResponseDataMap(data, topicNames);
+
     }
 
     @Override
@@ -304,8 +314,15 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
     public Map<Errors, Integer> errorCounts() {
         Map<Errors, Integer> errorCounts = new HashMap<>();
         updateErrorCounts(errorCounts, error());
-        responseDataMap.values().forEach(response ->
-            updateErrorCounts(errorCounts, response.error())
+        if (!supportsTopicIds()) {
+            responseDataMap.values().forEach(response ->
+                    updateErrorCounts(errorCounts, response.error())
+            );
+            return errorCounts;
+        }
+        data.responses().forEach(topic ->
+                topic.partitionResponses().forEach(partition ->
+                        updateErrorCounts(errorCounts, Errors.forCode(partition.errorCode())))
         );
         return errorCounts;
     }
@@ -328,34 +345,96 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
         return responseMap;
     }
 
-    private static <T extends BaseRecords> FetchResponseData toMessage(int throttleTimeMs, Errors error,
-                                                                       Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator,
-                                                                       int sessionId) {
-        List<FetchResponseData.FetchableTopicResponse> topicResponseList = new ArrayList<>();
-        partIterator.forEachRemaining(entry -> {
-            PartitionData<T> partitionData = entry.getValue();
-            // Since PartitionData alone doesn't know the partition ID, we set it here
-            partitionData.partitionResponse.setPartition(entry.getKey().partition());
-            // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
-            // batch is in the same topic group.
-            FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
-                    : topicResponseList.get(topicResponseList.size() - 1);
-            if (previousTopic != null && previousTopic.topic().equals(entry.getKey().topic()))
-                previousTopic.partitionResponses().add(partitionData.partitionResponse);
-            else {
-                List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
-                partitionResponses.add(partitionData.partitionResponse);
-                topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                        .setTopic(entry.getKey().topic())
-                        .setPartitionResponses(partitionResponses));
+    @SuppressWarnings("unchecked")
+    private static <T extends BaseRecords> LinkedHashMap<TopicPartition, PartitionData<T>> toResponseDataMap(
+            FetchResponseData message, Map<Uuid, String> topicNames) {
+        LinkedHashMap<TopicPartition, PartitionData<T>> responseMap = new LinkedHashMap<>();
+        message.responses().forEach(topicResponse -> {
+            String name = topicNames.get(topicResponse.topicId());
+            if (name != null) {
+                topicResponse.partitionResponses().forEach(partition ->
+                        responseMap.put(new TopicPartition(name, partition.partition()),
+                                new PartitionData(partition)
+                ));
             }
         });
+        return responseMap;
+    }
+
+    private static <T extends BaseRecords> FetchResponseData toMessage(int throttleTimeMs, Errors error,
+                                                                       Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator,
+                                                                       LinkedHashMap<Uuid, String> inOrderTopicNames,
+                                                                       int sessionId) {
+        List<FetchResponseData.FetchableTopicResponse> topicResponseList = new ArrayList<>();
+        if (inOrderTopicNames.isEmpty()) {
+            partIterator.forEachRemaining(entry -> {
+                PartitionData<T> partitionData = entry.getValue();
+                // Since PartitionData alone doesn't know the partition ID, we set it here
+                partitionData.partitionResponse.setPartition(entry.getKey().partition());
+                // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
+                // batch is in the same topic group.
+                FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
+                        : topicResponseList.get(topicResponseList.size() - 1);
+                if (previousTopic != null && previousTopic.topic().equals(entry.getKey().topic()))
+                    previousTopic.partitionResponses().add(partitionData.partitionResponse);
+                else {
+                    List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
+                    partitionResponses.add(partitionData.partitionResponse);
+                    topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                            .setTopic(entry.getKey().topic())
+                            .setPartitionResponses(partitionResponses));
+                }
+            });
+        } else {
+            inOrderTopicNames.forEach((id, name) -> {
+                if (name == null) {
+                    List<FetchResponseData.FetchablePartitionResponse> partitionResponses = Collections.singletonList(
+                            new FetchResponseData.FetchablePartitionResponse()
+                            // update with correct error code
+                            .setPartition(-1)
+                            .setErrorCode(Errors.UNKNOWN_TOPIC_OR_PARTITION.code())
+                            .setHighWatermark(FetchResponse.INVALID_HIGHWATERMARK)
+                            .setLastStableOffset(FetchResponse.INVALID_LAST_STABLE_OFFSET)
+                            .setLogStartOffset(FetchResponse.INVALID_LOG_START_OFFSET)
+                            .setAbortedTransactions(null)
+                            .setPreferredReadReplica(FetchResponse.INVALID_PREFERRED_REPLICA_ID)
+                            .setRecordSet(MemoryRecords.EMPTY));
+                    topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                            .setTopicId(id)
+                            .setPartitionResponses(partitionResponses));
+                } else {
+                    Map.Entry<TopicPartition, PartitionData<T>> part = partIterator.next();
+                    PartitionData<T> partitionData = part.getValue();
+                    // Since PartitionData alone doesn't know the partition ID, we set it here
+                    partitionData.partitionResponse.setPartition(part.getKey().partition());
+                    // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
+                    // batch is in the same topic group.
+                    FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
+                            : topicResponseList.get(topicResponseList.size() - 1);
+                    if (previousTopic != null && previousTopic.topic().equals(part.getKey().topic()))
+                        previousTopic.partitionResponses().add(partitionData.partitionResponse);
+                    else {
+                        List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
+                        partitionResponses.add(partitionData.partitionResponse);
+                        topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                                .setTopic(part.getKey().topic())
+                                .setTopicId(id)
+                                .setPartitionResponses(partitionResponses));
+                    }
+                }
+            });
+        }
 
         return new FetchResponseData()
                 .setThrottleTimeMs(throttleTimeMs)
                 .setErrorCode(error.code())
                 .setSessionId(sessionId)
                 .setResponses(topicResponseList);
+    }
+
+    private Boolean supportsTopicIds() {
+        return data.responses().stream().findFirst().filter(
+            topic -> !topic.topicId().equals(Uuid.ZERO_UUID)).isPresent();
     }
 
     /**
@@ -366,10 +445,11 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
      * @return              The response size in bytes.
      */
     public static <T extends BaseRecords> int sizeOf(short version,
-                                                     Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator) {
+                                                     Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator,
+                                                     LinkedHashMap<Uuid, String> inOrderTopicNames) {
         // Since the throttleTimeMs and metadata field sizes are constant and fixed, we can
         // use arbitrary values here without affecting the result.
-        FetchResponseData data = toMessage(0, Errors.NONE, partIterator, INVALID_SESSION_ID);
+        FetchResponseData data = toMessage(0, Errors.NONE, partIterator, inOrderTopicNames, INVALID_SESSION_ID);
         ObjectSerializationCache cache = new ObjectSerializationCache();
         return 4 + data.size(cache, version);
     }
