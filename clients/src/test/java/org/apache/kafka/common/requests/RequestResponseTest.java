@@ -852,8 +852,9 @@ public class RequestResponseTest {
     public void testFetchRequestCompat() {
         Map<TopicPartition, FetchRequest.PartitionData> fetchData = new HashMap<>();
         fetchData.put(new TopicPartition("test", 0), new FetchRequest.PartitionData(100, 2, 100, Optional.of(42)));
+        Map<String, Uuid> topicIds = Collections.singletonMap("test1", Uuid.randomUuid());
         FetchRequest req = FetchRequest.Builder
-                .forConsumer(100, 100, fetchData)
+                .forConsumer(100, 100, fetchData, topicIds)
                 .metadata(new FetchMetadata(10, 20))
                 .isolationLevel(IsolationLevel.READ_COMMITTED)
                 .build((short) 2);
@@ -1028,7 +1029,10 @@ public class RequestResponseTest {
                 1000000, Optional.empty()));
         fetchData.put(new TopicPartition("test2", 0), new FetchRequest.PartitionData(200, -1L,
                 1000000, Optional.empty()));
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData).
+        Map<String, Uuid> topicIds = new HashMap<>();
+        topicIds.put("test1", Uuid.randomUuid());
+        topicIds.put("test2", Uuid.randomUuid());
+        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).
             metadata(metadata).setMaxBytes(1000).toForget(toForget).build((short) version);
     }
 
@@ -1038,7 +1042,10 @@ public class RequestResponseTest {
                 1000000, Optional.empty()));
         fetchData.put(new TopicPartition("test2", 0), new FetchRequest.PartitionData(200, -1L,
                 1000000, Optional.empty()));
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData).
+        Map<String, Uuid> topicIds = new HashMap<>();
+        topicIds.put("test1", Uuid.randomUuid());
+        topicIds.put("test2", Uuid.randomUuid());
+        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).
             isolationLevel(isolationLevel).setMaxBytes(1000).build((short) version);
     }
 
@@ -1048,7 +1055,10 @@ public class RequestResponseTest {
                 1000000, Optional.empty()));
         fetchData.put(new TopicPartition("test2", 0), new FetchRequest.PartitionData(200, -1L,
                 1000000, Optional.empty()));
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData).setMaxBytes(1000).build((short) version);
+        Map<String, Uuid> topicIds = new HashMap<>();
+        topicIds.put("test1", Uuid.randomUuid());
+        topicIds.put("test2", Uuid.randomUuid());
+        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).setMaxBytes(1000).build((short) version);
     }
 
     private FetchResponse<MemoryRecords> createFetchResponse(Errors error, int sessionId) {

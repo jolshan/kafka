@@ -17,7 +17,7 @@
 package kafka.server
 
 import java.util
-import java.util.{Collections, Optional, Properties}
+import java.util.{Optional, Properties}
 
 import kafka.log.LogConfig
 import kafka.utils.TestUtils
@@ -91,11 +91,13 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
   def testV1FetchWithDownConversionDisabled(): Unit = {
     val topicMap = createTopics(numTopics = 5, numPartitions = 1)
     val topicPartitions = topicMap.keySet.toSeq
+    val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet)
+    val topicNames = topicIds.map(_.swap)
     topicPartitions.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
     val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
-      topicPartitions)).build(1)
+      topicPartitions), topicIds.asJava).build(1)
     val fetchResponse = sendFetchRequest(topicMap.head._2, fetchRequest)
-    topicPartitions.foreach(tp => assertEquals(Errors.UNSUPPORTED_VERSION, fetchResponse.responseData(Collections.emptyMap()).get(tp).error))
+    topicPartitions.foreach(tp => assertEquals(Errors.UNSUPPORTED_VERSION, fetchResponse.responseData(topicNames.asJava).get(tp).error))
   }
 
   /**
@@ -105,11 +107,13 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
   def testLatestFetchWithDownConversionDisabled(): Unit = {
     val topicMap = createTopics(numTopics = 5, numPartitions = 1)
     val topicPartitions = topicMap.keySet.toSeq
+    val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet)
+    val topicNames = topicIds.map(_.swap)
     topicPartitions.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
     val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
-      topicPartitions)).build()
+      topicPartitions), topicIds.asJava).build()
     val fetchResponse = sendFetchRequest(topicMap.head._2, fetchRequest)
-    topicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(Collections.emptyMap()).get(tp).error))
+    topicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(topicNames.asJava).get(tp).error))
   }
 
   /**
@@ -129,14 +133,16 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
 
     val allTopics = conversionDisabledTopicPartitions ++ conversionEnabledTopicPartitions
     val leaderId = conversionDisabledTopicsMap.head._2
+    val topicIds = zkClient.getTopicIdsForTopics(allTopics.map(_.topic()).toSet)
+    val topicNames = topicIds.map(_.swap)
 
     allTopics.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
     val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
-      allTopics)).build(1)
+      allTopics), topicIds.asJava).build(1)
     val fetchResponse = sendFetchRequest(leaderId, fetchRequest)
 
-    conversionDisabledTopicPartitions.foreach(tp => assertEquals(Errors.UNSUPPORTED_VERSION, fetchResponse.responseData(Collections.emptyMap()).get(tp).error))
-    conversionEnabledTopicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(Collections.emptyMap()).get(tp).error))
+    conversionDisabledTopicPartitions.foreach(tp => assertEquals(Errors.UNSUPPORTED_VERSION, fetchResponse.responseData(topicNames.asJava).get(tp).error))
+    conversionEnabledTopicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(topicNames.asJava).get(tp).error))
   }
 
   /**

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kafka.cluster.{Broker, EndPoint}
 import kafka.utils.TestUtils
 import org.apache.kafka.clients.{ClientResponse, ManualMetadataUpdater, Metadata, MockClient}
+import org.apache.kafka.common.Uuid
 import org.apache.kafka.common.feature.Features
 import org.apache.kafka.common.feature.Features.emptySupportedFeatures
 import org.apache.kafka.common.message.MetadataRequestData
@@ -88,7 +89,7 @@ class BrokerToControllerRequestThreadTest {
     when(metadataCache.getAliveBrokers).thenReturn(Seq(activeController))
     when(metadataCache.getAliveBroker(controllerId)).thenReturn(Some(activeController))
 
-    val expectedResponse = RequestTestUtils.metadataUpdateWith(2, Collections.singletonMap("a", 2))
+    val expectedResponse = RequestTestUtils.metadataUpdateWith(2, Collections.singletonMap("a", 2), Collections.singletonMap("a", Uuid.randomUuid()))
     val testRequestThread = new BrokerToControllerRequestThread(mockClient, new ManualMetadataUpdater(), metadataCache,
       config, listenerName, time, "", retryTimeoutMs = Long.MaxValue)
     mockClient.prepareResponse(expectedResponse)
@@ -136,7 +137,8 @@ class BrokerToControllerRequestThreadTest {
     when(metadataCache.getAliveBroker(newControllerId)).thenReturn(Some(newController))
     when(metadataCache.getAliveBrokers).thenReturn(Seq(oldController, newController))
 
-    val expectedResponse = RequestTestUtils.metadataUpdateWith(3, Collections.singletonMap("a", 2))
+    val expectedResponse = RequestTestUtils.metadataUpdateWith(3, Collections.singletonMap("a", 2),
+      Collections.singletonMap("a", Uuid.randomUuid()))
     val testRequestThread = new BrokerToControllerRequestThread(mockClient, new ManualMetadataUpdater(),
       metadataCache, config, listenerName, time, "", retryTimeoutMs = Long.MaxValue)
 
@@ -171,6 +173,7 @@ class BrokerToControllerRequestThreadTest {
     val config = new KafkaConfig(TestUtils.createBrokerConfig(1, "localhost:2181"))
     val oldControllerId = 1
     val newControllerId = 2
+    val topicIds = Collections.singletonMap("a", Uuid.randomUuid())
 
     val metadata = mock(classOf[Metadata])
     val mockClient = new MockClient(time, metadata)
@@ -189,8 +192,8 @@ class BrokerToControllerRequestThreadTest {
 
     val responseWithNotControllerError = RequestTestUtils.metadataUpdateWith("cluster1", 2,
       Collections.singletonMap("a", Errors.NOT_CONTROLLER),
-      Collections.singletonMap("a", 2))
-    val expectedResponse = RequestTestUtils.metadataUpdateWith(3, Collections.singletonMap("a", 2))
+      Collections.singletonMap("a", 2), topicIds)
+    val expectedResponse = RequestTestUtils.metadataUpdateWith(3, Collections.singletonMap("a", 2), topicIds)
     val testRequestThread = new BrokerToControllerRequestThread(mockClient, new ManualMetadataUpdater(), metadataCache,
       config, listenerName, time, "", retryTimeoutMs = Long.MaxValue)
 
@@ -240,7 +243,8 @@ class BrokerToControllerRequestThreadTest {
     val retryTimeoutMs = 30000
     val responseWithNotControllerError = RequestTestUtils.metadataUpdateWith("cluster1", 2,
       Collections.singletonMap("a", Errors.NOT_CONTROLLER),
-      Collections.singletonMap("a", 2))
+      Collections.singletonMap("a", 2),
+      Collections.singletonMap("a", Uuid.randomUuid()))
     val testRequestThread = new BrokerToControllerRequestThread(mockClient, new ManualMetadataUpdater(), metadataCache,
       config, listenerName, time, "", retryTimeoutMs)
 

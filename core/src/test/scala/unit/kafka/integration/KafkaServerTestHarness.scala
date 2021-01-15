@@ -43,6 +43,8 @@ abstract class KafkaServerTestHarness extends ZooKeeperTestHarness {
   var servers: Buffer[KafkaServer] = new ArrayBuffer
   var brokerList: String = null
   var alive: Array[Boolean] = null
+  //var topicIds = new mutable.HashMap[String, Uuid]()
+  //var topicNames = new mutable.HashMap[Uuid, String]()
 
   /**
    * Implementations must override this method to return a set of KafkaConfigs. This method will be invoked for every
@@ -106,6 +108,9 @@ abstract class KafkaServerTestHarness extends ZooKeeperTestHarness {
 
     // default implementation is a no-op, it is overridden by subclasses if required
     configureSecurityAfterServersStart()
+
+    //zkClient.getTopicIdsForTopics(Set("__consumer_offsets")).foreachEntry((name, id) => topicIds.put(name, id))
+    //topicIds.foreachEntry( (name, id) => topicNames.put(id, name))
   }
 
   @After
@@ -122,16 +127,25 @@ abstract class KafkaServerTestHarness extends ZooKeeperTestHarness {
    * Return the leader for each partition.
    */
   def createTopic(topic: String, numPartitions: Int = 1, replicationFactor: Int = 1,
-                  topicConfig: Properties = new Properties): scala.collection.immutable.Map[Int, Int] =
-    TestUtils.createTopic(zkClient, topic, numPartitions, replicationFactor, servers, topicConfig)
+                  topicConfig: Properties = new Properties): scala.collection.immutable.Map[Int, Int] = {
+    val createTopicResult = TestUtils.createTopic(zkClient, topic, numPartitions, replicationFactor, servers, topicConfig)
+    //zkClient.getTopicIdsForTopics(Set(topic)).foreachEntry((name, id) => topicIds.put(name, id))
+    //topicIds.foreachEntry( (name, id) => topicNames.put(id, name))
+    createTopicResult
+  }
+
 
   /**
    * Create a topic in ZooKeeper using a customized replica assignment.
    * Wait until the leader is elected and the metadata is propagated to all brokers.
    * Return the leader for each partition.
    */
-  def createTopic(topic: String, partitionReplicaAssignment: collection.Map[Int, Seq[Int]]): scala.collection.immutable.Map[Int, Int] =
-    TestUtils.createTopic(zkClient, topic, partitionReplicaAssignment, servers)
+  def createTopic(topic: String, partitionReplicaAssignment: collection.Map[Int, Seq[Int]]): scala.collection.immutable.Map[Int, Int] = {
+    val createTopicResult = TestUtils.createTopic(zkClient, topic, partitionReplicaAssignment, servers)
+    //zkClient.getTopicIdsForTopics(Set(topic)).foreachEntry((name, id) => topicIds.put(name, id))
+    //topicIds.foreachEntry( (name, id) => topicNames.put(id, name))
+    createTopicResult
+  }
 
   /**
    * Pick a broker at random and kill it if it isn't already dead

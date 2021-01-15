@@ -710,6 +710,7 @@ class KafkaApis(val requestChannel: RequestChannel,
     val clientId = request.header.clientId
     val fetchRequest = request.body[FetchRequest]
     val topicNames = metadataCache.getTopicNames().asJava
+    val topicIds = metadataCache.getTopicIds().asJava
     val fetchContext = fetchManager.newContext(
       fetchRequest.metadata,
       fetchRequest.fetchData(topicNames),
@@ -735,19 +736,6 @@ class KafkaApis(val requestChannel: RequestChannel,
         FetchResponse.INVALID_LOG_START_OFFSET, null, MemoryRecords.EMPTY)
     }
 
-    // Collect errors for topic IDs that can not be found.
-    //val topicErrors = mutable.ArrayBuffer[(Uuid, FetchResponse.PartitionData[BaseRecords])]()
-
-    if (fetchRequest.version() >= 13) {
-      fetchRequest.data().topics().forEach { topic =>
-        val name = topicNames.get(topic.topicId())
-        //if (name == null) {
-          // CHANGE TO UNKNOWN TOPIC ID ONCE ADDED
-        //  topicErrors += topic.topicId() -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-        //}
-        inOrderTopicNames.put(topic.topicId(), name)
-      }
-    }
 
     val erroneous = mutable.ArrayBuffer[(TopicPartition, FetchResponse.PartitionData[Records])]()
     val interesting = mutable.ArrayBuffer[(TopicPartition, FetchRequest.PartitionData)]()
@@ -757,8 +745,10 @@ class KafkaApis(val requestChannel: RequestChannel,
         fetchContext.foreachPartition { (topicPartition, data) =>
           if (!metadataCache.contains(topicPartition))
             erroneous += topicPartition -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-          else
+          else {
             interesting += (topicPartition -> data)
+            if (fetchRequest.version() >= 13) inOrderTopicNames.put(topicIds.get(topicPartition.topic()), topicPartition.topic())
+          }
         }
       } else {
         fetchContext.foreachPartition { (part, _) =>
@@ -777,8 +767,21 @@ class KafkaApis(val requestChannel: RequestChannel,
           erroneous += topicPartition -> errorResponse(Errors.TOPIC_AUTHORIZATION_FAILED)
         else if (!metadataCache.contains(topicPartition))
           erroneous += topicPartition -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-        else
+        else {
           interesting += (topicPartition -> data)
+          if (fetchRequest.version() >= 13) inOrderTopicNames.put(topicIds.get(topicPartition.topic()), topicPartition.topic())
+        }
+      }
+    }
+
+    if (fetchRequest.version() >= 13) {
+      fetchRequest.data().topics().forEach { topic =>
+        val name = topicNames.get(topic.topicId())
+        //if (name == null) {
+        // CHANGE TO UNKNOWN TOPIC ID ONCE ADDED
+        //  topicErrors += topic.topicId() -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
+        //}
+        inOrderTopicNames.putIfAbsent(topic.topicId(), name)
       }
     }
 

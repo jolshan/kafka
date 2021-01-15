@@ -83,7 +83,7 @@ class BaseClientQuotaManagerTest {
 
   protected def throttle(quotaManager: ClientQuotaManager, user: String, clientId: String, throttleTimeMs: Int,
                          channelThrottlingCallback: RequestChannel.Response => Unit): Unit = {
-    val (_, request) = buildRequest(FetchRequest.Builder.forConsumer(0, 1000, new util.HashMap[TopicPartition, PartitionData]))
+    val (_, request) = buildRequest(FetchRequest.Builder.forConsumer(0, 1000, new util.HashMap[TopicPartition, PartitionData], Collections.emptyMap()))
     quotaManager.throttle(request, throttleTimeMs, channelThrottlingCallback)
   }
 }

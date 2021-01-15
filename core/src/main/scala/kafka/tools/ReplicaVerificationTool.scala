@@ -23,7 +23,7 @@ import java.util
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import java.util.regex.{Pattern, PatternSyntaxException}
-import java.util.{Collections, Date, Optional, Properties}
+import java.util.{Date, Optional, Properties}
 
 import joptsimple.OptionParser
 import kafka.api._
@@ -40,7 +40,7 @@ import org.apache.kafka.common.requests.AbstractRequest.Builder
 import org.apache.kafka.common.requests.{AbstractRequest, FetchResponse, ListOffsetsRequest, FetchRequest => JFetchRequest}
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.utils.{LogContext, Time}
-import org.apache.kafka.common.{Node, TopicPartition}
+import org.apache.kafka.common.{Node, TopicPartition, Uuid}
 
 import scala.jdk.CollectionConverters._
 import scala.collection.Seq
@@ -144,6 +144,8 @@ object ReplicaVerificationTool extends Logging {
       finally CoreUtils.swallow(adminClient.close(), this)
     }
 
+    val topicIds = topicsMetadata.map( metadata => metadata.name() -> metadata.topicId()).toMap
+
     val filteredTopicMetadata = topicsMetadata.filter { topicMetaData =>
       topicWhiteListFiler.isTopicAllowed(topicMetaData.name, excludeInternalTopics = false)
     }
@@ -189,6 +191,7 @@ object ReplicaVerificationTool extends Logging {
       new ReplicaFetcher(name = s"ReplicaFetcher-$brokerId",
         sourceBroker = brokerInfo(brokerId),
         topicPartitions = topicPartitions,
+        topicIds = topicIds,
         replicaBuffer = replicaBuffer,
         socketTimeout = 30000,
         socketBufferSize = 256000,
@@ -380,13 +383,15 @@ private class ReplicaBuffer(expectedReplicasPerTopicPartition: collection.Map[To
 }
 
 private class ReplicaFetcher(name: String, sourceBroker: Node, topicPartitions: Iterable[TopicPartition],
-                             replicaBuffer: ReplicaBuffer, socketTimeout: Int, socketBufferSize: Int,
+                             topicIds: Map[String, Uuid], replicaBuffer: ReplicaBuffer, socketTimeout: Int, socketBufferSize: Int,
                              fetchSize: Int, maxWait: Int, minBytes: Int, doVerification: Boolean, consumerConfig: Properties,
                              fetcherId: Int)
   extends ShutdownableThread(name) {
 
   private val fetchEndpoint = new ReplicaFetcherBlockingSend(sourceBroker, new ConsumerConfig(consumerConfig), new Metrics(), Time.SYSTEM, fetcherId,
     s"broker-${Request.DebuggingConsumerId}-fetcher-$fetcherId")
+
+  private val topicNames = topicIds.map(_.swap)
 
   override def doWork(): Unit = {
 
@@ -398,9 +403,8 @@ private class ReplicaFetcher(name: String, sourceBroker: Node, topicPartitions: 
       requestMap.put(topicPartition, new JFetchRequest.PartitionData(replicaBuffer.getOffset(topicPartition),
         0L, fetchSize, Optional.empty()))
 
-    // TO DO: PUT GOOD REPLACEMENT FOR EMPTY MAP
     val fetchRequestBuilder = JFetchRequest.Builder.
-      forReplica(ApiKeys.FETCH.latestVersion, Request.DebuggingConsumerId, maxWait, minBytes, requestMap, Collections.emptyMap)
+      forReplica(ApiKeys.FETCH.latestVersion, Request.DebuggingConsumerId, maxWait, minBytes, requestMap, topicIds.asJava)
 
     debug("Issuing fetch request ")
 
@@ -415,8 +419,7 @@ private class ReplicaFetcher(name: String, sourceBroker: Node, topicPartitions: 
     }
 
     if (fetchResponse != null) {
-      // REPLACE EMPTY MAP HERE AS WELL.
-      fetchResponse.responseData(Collections.emptyMap()).forEach { (tp, partitionData) =>
+      fetchResponse.responseData(topicNames.asJava).forEach { (tp, partitionData) =>
         replicaBuffer.addFetchedData(tp, sourceBroker.id, partitionData)
       }
     } else {

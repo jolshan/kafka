@@ -18,6 +18,7 @@
 package org.apache.kafka.clients;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.FetchMetadata;
 import org.apache.kafka.common.requests.FetchRequest.PartitionData;
@@ -315,15 +316,15 @@ public class FetchSessionHandler {
     /**
      * Verify that a full fetch response contains all the partitions in the fetch session.
      *
-     * @param response  The response.
-     * @return          True if the full fetch response partitions are valid.
+     * @param topicPartitions  The topicPartitions from the FetchResponse.
+     * @return                 True if the full fetch response partitions are valid.
      */
-    String verifyFullFetchResponsePartitions(FetchResponse<?> response) {
+    String verifyFullFetchResponsePartitions(Set<TopicPartition> topicPartitions) {
         StringBuilder bld = new StringBuilder();
         Set<TopicPartition> extra =
-            findMissing(response.responseData(Collections.emptyMap()).keySet(), sessionPartitions.keySet());
+            findMissing(topicPartitions, sessionPartitions.keySet());
         Set<TopicPartition> omitted =
-            findMissing(sessionPartitions.keySet(), response.responseData(Collections.emptyMap()).keySet());
+            findMissing(sessionPartitions.keySet(), topicPartitions);
         if (!omitted.isEmpty()) {
             bld.append("omitted=(").append(Utils.join(omitted, ", ")).append(", ");
         }
@@ -331,7 +332,7 @@ public class FetchSessionHandler {
             bld.append("extra=(").append(Utils.join(extra, ", ")).append(", ");
         }
         if ((!omitted.isEmpty()) || (!extra.isEmpty())) {
-            bld.append("response=(").append(Utils.join(response.responseData(Collections.emptyMap()).keySet(), ", ")).append(")");
+            bld.append("response=(").append(Utils.join(topicPartitions, ", ")).append(")");
             return bld.toString();
         }
         return null;
@@ -340,17 +341,17 @@ public class FetchSessionHandler {
     /**
      * Verify that the partitions in an incremental fetch response are contained in the session.
      *
-     * @param response  The response.
-     * @return          True if the incremental fetch response partitions are valid.
+     * @param topicPartitions  The topicPartitions from the FetchResponse.
+     * @return                 True if the incremental fetch response partitions are valid.
      */
-    String verifyIncrementalFetchResponsePartitions(FetchResponse<?> response) {
+    String verifyIncrementalFetchResponsePartitions(Set<TopicPartition> topicPartitions) {
         Set<TopicPartition> extra =
-            findMissing(response.responseData(Collections.emptyMap()).keySet(), sessionPartitions.keySet());
+            findMissing(topicPartitions, sessionPartitions.keySet());
         if (!extra.isEmpty()) {
             StringBuilder bld = new StringBuilder();
             bld.append("extra=(").append(Utils.join(extra, ", ")).append("), ");
             bld.append("response=(").append(
-                Utils.join(response.responseData(Collections.emptyMap()).keySet(), ", ")).append("), ");
+                Utils.join(topicPartitions, ", ")).append("), ");
             return bld.toString();
         }
         return null;
@@ -359,28 +360,28 @@ public class FetchSessionHandler {
     /**
      * Create a string describing the partitions in a FetchResponse.
      *
-     * @param response  The FetchResponse.
-     * @return          The string to log.
+     * @param topicPartitions  The topicPartitions from the FetchResponse.
+     * @return                 The string to log.
      */
-    private String responseDataToLogString(FetchResponse<?> response) {
+    private String responseDataToLogString(Set<TopicPartition> topicPartitions) {
         if (!log.isTraceEnabled()) {
-            int implied = sessionPartitions.size() - response.responseData(Collections.emptyMap()).size();
+            int implied = sessionPartitions.size() - topicPartitions.size();
             if (implied > 0) {
                 return String.format(" with %d response partition(s), %d implied partition(s)",
-                    response.responseData(Collections.emptyMap()).size(), implied);
+                    topicPartitions.size(), implied);
             } else {
                 return String.format(" with %d response partition(s)",
-                    response.responseData(Collections.emptyMap()).size());
+                    topicPartitions.size());
             }
         }
         StringBuilder bld = new StringBuilder();
         bld.append(" with response=(").
-            append(Utils.join(response.responseData(Collections.emptyMap()).keySet(), ", ")).
+            append(Utils.join(topicPartitions, ", ")).
             append(")");
         String prefix = ", implied=(";
         String suffix = "";
         for (TopicPartition partition : sessionPartitions.keySet()) {
-            if (!response.responseData(Collections.emptyMap()).containsKey(partition)) {
+            if (!topicPartitions.contains(partition)) {
                 bld.append(prefix);
                 bld.append(partition);
                 prefix = ", ";
@@ -398,7 +399,7 @@ public class FetchSessionHandler {
      * @return          True if the response is well-formed; false if it can't be processed
      *                  because of missing or unexpected partitions.
      */
-    public boolean handleResponse(FetchResponse<?> response) {
+    public boolean handleResponse(FetchResponse<?> response, Map<Uuid, String> topicNames) {
         if (response.error() != Errors.NONE) {
             log.info("Node {} was unable to process the fetch request with {}: {}.",
                 node, nextMetadata, response.error());
@@ -409,8 +410,9 @@ public class FetchSessionHandler {
             }
             return false;
         }
+        Set<TopicPartition> topicPartitions = response.responseData(topicNames).keySet();
         if (nextMetadata.isFull()) {
-            if (response.responseData(Collections.emptyMap()).isEmpty() && response.throttleTimeMs() > 0) {
+            if (topicPartitions.isEmpty() && response.throttleTimeMs() > 0) {
                 // Normally, an empty full fetch response would be invalid.  However, KIP-219
                 // specifies that if the broker wants to throttle the client, it will respond
                 // to a full fetch request with an empty response and a throttleTimeMs
@@ -424,26 +426,26 @@ public class FetchSessionHandler {
                 nextMetadata = FetchMetadata.INITIAL;
                 return false;
             }
-            String problem = verifyFullFetchResponsePartitions(response);
+            String problem = verifyFullFetchResponsePartitions(topicPartitions);
             if (problem != null) {
                 log.info("Node {} sent an invalid full fetch response with {}", node, problem);
                 nextMetadata = FetchMetadata.INITIAL;
                 return false;
             } else if (response.sessionId() == INVALID_SESSION_ID) {
                 if (log.isDebugEnabled())
-                    log.debug("Node {} sent a full fetch response{}", node, responseDataToLogString(response));
+                    log.debug("Node {} sent a full fetch response{}", node, responseDataToLogString(topicPartitions));
                 nextMetadata = FetchMetadata.INITIAL;
                 return true;
             } else {
                 // The server created a new incremental fetch session.
                 if (log.isDebugEnabled())
                     log.debug("Node {} sent a full fetch response that created a new incremental " +
-                            "fetch session {}{}", node, response.sessionId(), responseDataToLogString(response));
+                            "fetch session {}{}", node, response.sessionId(), responseDataToLogString(topicPartitions));
                 nextMetadata = FetchMetadata.newIncremental(response.sessionId());
                 return true;
             }
         } else {
-            String problem = verifyIncrementalFetchResponsePartitions(response);
+            String problem = verifyIncrementalFetchResponsePartitions(topicPartitions);
             if (problem != null) {
                 log.info("Node {} sent an invalid incremental fetch response with {}", node, problem);
                 nextMetadata = nextMetadata.nextCloseExisting();
@@ -452,7 +454,7 @@ public class FetchSessionHandler {
                 // The incremental fetch session was closed by the server.
                 if (log.isDebugEnabled())
                     log.debug("Node {} sent an incremental fetch response closing session {}{}",
-                            node, nextMetadata.sessionId(), responseDataToLogString(response));
+                            node, nextMetadata.sessionId(), responseDataToLogString(topicPartitions));
                 nextMetadata = FetchMetadata.INITIAL;
                 return true;
             } else {
@@ -462,7 +464,7 @@ public class FetchSessionHandler {
                 if (log.isDebugEnabled())
                     log.debug("Node {} sent an incremental fetch response with throttleTimeMs = {} " +
                         "for session {}{}", node, response.throttleTimeMs(), response.sessionId(),
-                        responseDataToLogString(response));
+                        responseDataToLogString(topicPartitions));
                 nextMetadata = nextMetadata.nextIncremental();
                 return true;
             }

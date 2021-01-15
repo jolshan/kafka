@@ -71,8 +71,11 @@ public class FetchSessionBenchmark {
         handler = new FetchSessionHandler(LOG_CONTEXT, 1);
         FetchSessionHandler.Builder builder = handler.newBuilder();
 
-        LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> respMap = new LinkedHashMap<>();
         LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
+        Uuid id = Uuid.randomUuid();
+        topicNames.put(id, "foo");
+
+        LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> respMap = new LinkedHashMap<>();
         for (int i = 0; i < partitionCount; i++) {
             TopicPartition tp = new TopicPartition("foo", i);
             FetchRequest.PartitionData partitionData = new FetchRequest.PartitionData(0, 0, 200,
@@ -89,7 +92,7 @@ public class FetchSessionBenchmark {
         }
         builder.build();
         // build and handle an initial response so that the next fetch will be incremental
-        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, topicNames, 0, 1));
+        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, topicNames, 0, 1), topicNames);
 
         int counter = 0;
         for (TopicPartition topicPartition: new ArrayList<>(fetches.keySet())) {

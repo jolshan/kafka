@@ -249,7 +249,7 @@ public class ConsumerNetworkClientTest {
     @Test(expected = InvalidTopicException.class)
     public void testInvalidTopicExceptionPropagatedFromMetadata() {
         MetadataResponse metadataResponse = RequestTestUtils.metadataUpdateWith("clusterId", 1,
-                Collections.singletonMap("topic", Errors.INVALID_TOPIC_EXCEPTION), Collections.emptyMap());
+                Collections.singletonMap("topic", Errors.INVALID_TOPIC_EXCEPTION), Collections.emptyMap(), Collections.emptyMap());
         metadata.updateWithCurrentRequestVersion(metadataResponse, false, time.milliseconds());
         consumerClient.poll(time.timer(Duration.ZERO));
     }
@@ -257,7 +257,7 @@ public class ConsumerNetworkClientTest {
     @Test(expected = TopicAuthorizationException.class)
     public void testTopicAuthorizationExceptionPropagatedFromMetadata() {
         MetadataResponse metadataResponse = RequestTestUtils.metadataUpdateWith("clusterId", 1,
-                Collections.singletonMap("topic", Errors.TOPIC_AUTHORIZATION_FAILED), Collections.emptyMap());
+                Collections.singletonMap("topic", Errors.TOPIC_AUTHORIZATION_FAILED), Collections.emptyMap(), Collections.emptyMap());
         metadata.updateWithCurrentRequestVersion(metadataResponse, false, time.milliseconds());
         consumerClient.poll(time.timer(Duration.ZERO));
     }

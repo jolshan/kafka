@@ -129,7 +129,7 @@ public class AbstractCoordinatorTest {
                                                         HEARTBEAT_INTERVAL_MS);
         metrics = new Metrics(mockTime);
 
-        mockClient.updateMetadata(RequestTestUtils.metadataUpdateWith(1, emptyMap()));
+        mockClient.updateMetadata(RequestTestUtils.metadataUpdateWith(1, emptyMap(), emptyMap()));
         this.node = metadata.fetch().nodes().get(0);
         this.coordinatorNode = new Node(Integer.MAX_VALUE - node.id(), node.host(), node.port());
 

@@ -32,6 +32,7 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.DisconnectException;
@@ -122,6 +123,12 @@ import static org.junit.Assert.fail;
 public class ConsumerCoordinatorTest {
     private final String topic1 = "test1";
     private final String topic2 = "test2";
+    private final Map<String, Uuid> topicIds = new HashMap<String, Uuid>() {
+        {
+            put(topic1, Uuid.randomUuid());
+            put(topic2, Uuid.randomUuid());
+        }
+    };
     private final TopicPartition t1p = new TopicPartition(topic1, 0);
     private final TopicPartition t2p = new TopicPartition(topic2, 0);
     private final String groupId = "test-group";
@@ -149,7 +156,7 @@ public class ConsumerCoordinatorTest {
             put(topic1, 1);
             put(topic2, 1);
         }
-    });
+    }, topicIds);
     private Node node = metadataResponse.brokers().iterator().next();
     private SubscriptionState subscriptions;
     private ConsumerMetadata metadata;
@@ -822,7 +829,7 @@ public class ConsumerCoordinatorTest {
 
         // partially update the metadata with one topic first,
         // let the leader to refresh metadata during assignment
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
@@ -860,7 +867,7 @@ public class ConsumerCoordinatorTest {
         final List<TopicPartition> owned = Collections.emptyList();
         final List<TopicPartition> oldAssigned = singletonList(t1p);
         subscriptions.subscribe(Pattern.compile(".*"), rebalanceListener);
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
         coordinator.maybeUpdateSubscriptionMetadata();
 
         assertEquals(singleton(topic1), subscriptions.subscription());
@@ -879,7 +886,7 @@ public class ConsumerCoordinatorTest {
             final Map<String, Integer> updatedPartitions = new HashMap<>();
             for (String topic : updatedSubscription)
                 updatedPartitions.put(topic, 1);
-            client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, updatedPartitions));
+            client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, updatedPartitions, topicIds));
             return true;
         }, syncGroupResponse(oldAssigned, Errors.NONE));
         coordinator.poll(time.timer(Long.MAX_VALUE));
@@ -914,7 +921,7 @@ public class ConsumerCoordinatorTest {
         }, joinGroupLeaderResponse(2, consumerId, updatedSubscriptions, Errors.NONE));
         // update the metadata again back to topic1
         client.prepareResponse(body -> {
-            client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+            client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
             return true;
         }, syncGroupResponse(newAssigned, Errors.NONE));
 
@@ -970,7 +977,7 @@ public class ConsumerCoordinatorTest {
         // Set up a non-leader consumer with pattern subscription and a cluster containing one topic matching the
         // pattern.
         subscriptions.subscribe(Pattern.compile(".*"), rebalanceListener);
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
         coordinator.maybeUpdateSubscriptionMetadata();
         assertEquals(singleton(topic1), subscriptions.subscription());
 
@@ -1015,7 +1022,7 @@ public class ConsumerCoordinatorTest {
         final List<TopicPartition> partitions = Arrays.asList(t1p, t2p);
         subscriptions.subscribe(toSet(topics), rebalanceListener);
         client.updateMetadata(RequestTestUtils.metadataUpdateWith(1,
-                Utils.mkMap(Utils.mkEntry(topic1, 1), Utils.mkEntry(topic2, 1))));
+                Utils.mkMap(Utils.mkEntry(topic1, 1), Utils.mkEntry(topic2, 1)), topicIds));
         coordinator.maybeUpdateSubscriptionMetadata();
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
@@ -1037,13 +1044,13 @@ public class ConsumerCoordinatorTest {
         assertEquals(1, rebalanceListener.assignedCount);
 
         // Change metadata to trigger rebalance.
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
         coordinator.poll(time.timer(0));
 
         // Revert metadata to original value. Fail pending JoinGroup. Another
         // JoinGroup should be sent, which will be completed successfully.
         client.updateMetadata(RequestTestUtils.metadataUpdateWith(1,
-                Utils.mkMap(Utils.mkEntry(topic1, 1), Utils.mkEntry(topic2, 1))));
+                Utils.mkMap(Utils.mkEntry(topic1, 1), Utils.mkEntry(topic2, 1)), topicIds));
         client.respond(joinGroupFollowerResponse(1, consumerId, "leader", Errors.NOT_COORDINATOR));
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.poll(time.timer(0));
@@ -1171,7 +1178,7 @@ public class ConsumerCoordinatorTest {
 
         // partially update the metadata with one topic first,
         // let the leader to refresh metadata during assignment
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
@@ -1378,7 +1385,8 @@ public class ConsumerCoordinatorTest {
         assertFalse(coordinator.rejoinNeededOrPending());
 
         // a new partition is added to the topic
-        metadata.updateWithCurrentRequestVersion(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 2)), false, time.milliseconds());
+        metadata.updateWithCurrentRequestVersion(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 2), topicIds),
+                false, time.milliseconds());
         coordinator.maybeUpdateSubscriptionMetadata();
 
         // we should detect the change and ask for reassignment
@@ -1398,7 +1406,7 @@ public class ConsumerCoordinatorTest {
         subscriptions.subscribe(new HashSet<>(topics), rebalanceListener);
 
         // we only have metadata for one topic initially
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
@@ -1417,7 +1425,7 @@ public class ConsumerCoordinatorTest {
                 Map<String, Integer> topicPartitionCounts = new HashMap<>();
                 topicPartitionCounts.put(topic1, 1);
                 topicPartitionCounts.put(topic2, 1);
-                client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, topicPartitionCounts));
+                client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, topicPartitionCounts, topicIds));
                 return true;
             }
             return false;
@@ -1443,7 +1451,7 @@ public class ConsumerCoordinatorTest {
         // Subscribe to two topics of which only one is authorized and verify that metadata failure is propagated.
         subscriptions.subscribe(Utils.mkSet(topic1, topic2), rebalanceListener);
         client.prepareMetadataUpdate(RequestTestUtils.metadataUpdateWith("kafka-cluster", 1,
-                Collections.singletonMap(topic2, Errors.TOPIC_AUTHORIZATION_FAILED), singletonMap(topic1, 1)));
+                Collections.singletonMap(topic2, Errors.TOPIC_AUTHORIZATION_FAILED), singletonMap(topic1, 1), topicIds));
         assertThrows(TopicAuthorizationException.class, () -> coordinator.poll(time.timer(Long.MAX_VALUE)));
 
         client.respond(groupCoordinatorResponse(node, Errors.NONE));
@@ -1459,7 +1467,7 @@ public class ConsumerCoordinatorTest {
         subscriptions.subscribe(Utils.mkSet(topic1), rebalanceListener);
         assertEquals(Collections.singleton(topic1), subscriptions.metadataTopics());
         client.prepareMetadataUpdate(RequestTestUtils.metadataUpdateWith("kafka-cluster", 1,
-                Collections.emptyMap(), singletonMap(topic1, 1)));
+                Collections.emptyMap(), singletonMap(topic1, 1), topicIds));
 
         Map<String, List<String>> memberSubscriptions = singletonMap(consumerId, singletonList(topic1));
         partitionAssignor.prepare(singletonMap(consumerId, singletonList(t1p)));
@@ -1491,7 +1499,7 @@ public class ConsumerCoordinatorTest {
         subscriptions.subscribe(topics, rebalanceListener);
 
         // we only have metadata for one topic initially
-        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1)));
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap(topic1, 1), topicIds));
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
@@ -1539,7 +1547,7 @@ public class ConsumerCoordinatorTest {
             subscriptions.subscribe(singleton(topic1), rebalanceListener);
 
         client.prepareMetadataUpdate(RequestTestUtils.metadataUpdateWith("kafka-cluster", 1,
-                Collections.singletonMap(topic1, Errors.UNKNOWN_TOPIC_OR_PARTITION), Collections.emptyMap()));
+                Collections.singletonMap(topic1, Errors.UNKNOWN_TOPIC_OR_PARTITION), Collections.emptyMap(), Collections.emptyMap()));
 
         client.prepareResponse(groupCoordinatorResponse(node, Errors.NONE));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
@@ -1560,7 +1568,7 @@ public class ConsumerCoordinatorTest {
             topicErrors.put(topic, Errors.UNKNOWN_TOPIC_OR_PARTITION);
 
         client.prepareMetadataUpdate(RequestTestUtils.metadataUpdateWith("kafka-cluster", 1,
-                topicErrors, singletonMap(topic1, 1)));
+                topicErrors, singletonMap(topic1, 1), topicIds));
 
         consumerClient.poll(time.timer(0));
         client.prepareResponse(joinGroupLeaderResponse(2, consumerId, memberSubscriptions, Errors.NONE));
@@ -2357,7 +2365,7 @@ public class ConsumerCoordinatorTest {
 
         // Initial leader epoch of 4
         MetadataResponse metadataResponse = RequestTestUtils.metadataUpdateWith("kafka-cluster", 1,
-                Collections.emptyMap(), singletonMap(topic1, 1), tp -> 4);
+                Collections.emptyMap(), singletonMap(topic1, 1), tp -> 4, topicIds);
         client.updateMetadata(metadataResponse);
 
         // Load offsets from previous epoch

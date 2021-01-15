@@ -92,7 +92,7 @@ public class FetchRequestBenchmark {
         }
 
         this.header = new RequestHeader(ApiKeys.FETCH, ApiKeys.FETCH.latestVersion(), "jmh-benchmark", 100);
-        this.consumerRequest = FetchRequest.Builder.forConsumer(0, 0, fetchData)
+        this.consumerRequest = FetchRequest.Builder.forConsumer(0, 0, fetchData, topicIds)
             .build(ApiKeys.FETCH.latestVersion());
         this.replicaRequest = FetchRequest.Builder.forReplica(ApiKeys.FETCH.latestVersion(), 1, 0, 0, fetchData, topicIds)
             .build(ApiKeys.FETCH.latestVersion());
@@ -107,7 +107,7 @@ public class FetchRequestBenchmark {
 
     @Benchmark
     public int testFetchRequestForConsumer() {
-        FetchRequest fetchRequest = FetchRequest.Builder.forConsumer(0, 0, fetchData)
+        FetchRequest fetchRequest = FetchRequest.Builder.forConsumer(0, 0, fetchData, topicIds)
             .build(ApiKeys.FETCH.latestVersion());
         return fetchRequest.fetchData(topicNames).size();
     }

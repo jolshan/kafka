@@ -190,9 +190,10 @@ public class FetchRequest extends AbstractRequest {
         private List<TopicPartition> toForget = Collections.emptyList();
         private String rackId = "";
 
-        public static Builder forConsumer(int maxWait, int minBytes, Map<TopicPartition, PartitionData> fetchData) {
+        public static Builder forConsumer(int maxWait, int minBytes, Map<TopicPartition, PartitionData> fetchData,
+                                          Map<String, Uuid> topicIds) {
             return new Builder(ApiKeys.FETCH.oldestVersion(), ApiKeys.FETCH.latestVersion(),
-                CONSUMER_REPLICA_ID, maxWait, minBytes, fetchData, Collections.emptyMap());
+                CONSUMER_REPLICA_ID, maxWait, minBytes, fetchData, topicIds);
         }
 
         public static Builder forReplica(short allowedVersion, int replicaId, int maxWait, int minBytes,
@@ -320,7 +321,7 @@ public class FetchRequest extends AbstractRequest {
 
     public FetchRequest(FetchRequestData fetchRequestData, short version) {
         super(ApiKeys.FETCH, version);
-        if (version() > 13) {
+        if (version() < 13) {
             this.data = fetchRequestData;
             this.fetchData = toPartitionDataMap(fetchRequestData.topics());
             this.toForget = toForgottenTopicList(fetchRequestData.forgottenTopicsData());
@@ -394,13 +395,13 @@ public class FetchRequest extends AbstractRequest {
     }
 
     public Map<TopicPartition, PartitionData> fetchData(Map<Uuid, String> topicNames) {
-        if (version() > 13)
+        if (version() < 13)
             return fetchData;
         return toPartitionDataMap(data.topics(), topicNames);
     }
 
     public List<TopicPartition> toForget(Map<Uuid, String> topicNames) {
-        if (version() > 13)
+        if (version() < 13)
             return toForget;
         return toForgottenTopicList(data.forgottenTopicsData(), topicNames);
     }

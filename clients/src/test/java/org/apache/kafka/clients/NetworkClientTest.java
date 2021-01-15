@@ -650,7 +650,7 @@ public class NetworkClientTest {
     public void testAuthenticationFailureWithInFlightMetadataRequest() {
         int refreshBackoffMs = 50;
 
-        MetadataResponse metadataResponse = RequestTestUtils.metadataUpdateWith(2, Collections.emptyMap());
+        MetadataResponse metadataResponse = RequestTestUtils.metadataUpdateWith(2, Collections.emptyMap(), Collections.emptyMap());
         Metadata metadata = new Metadata(refreshBackoffMs, 5000, new LogContext(), new ClusterResourceListeners());
         metadata.updateWithCurrentRequestVersion(metadataResponse, false, time.milliseconds());
 

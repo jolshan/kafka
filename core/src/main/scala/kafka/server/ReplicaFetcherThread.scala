@@ -217,10 +217,11 @@ class ReplicaFetcherThread(name: String,
     try {
       val clientResponse = leaderEndpoint.sendRequest(fetchRequest)
       val fetchResponse = clientResponse.responseBody.asInstanceOf[FetchResponse[Records]]
-      if (!fetchSessionHandler.handleResponse(fetchResponse)) {
+      val topicNames = replicaMgr.metadataCache.getTopicNames().asJava
+      if (!fetchSessionHandler.handleResponse(fetchResponse, topicNames)) {
         Map.empty
       } else {
-        fetchResponse.responseData(replicaMgr.metadataCache.getTopicNames().asJava).asScala
+        fetchResponse.responseData(topicNames).asScala
       }
     } catch {
       case t: Throwable =>

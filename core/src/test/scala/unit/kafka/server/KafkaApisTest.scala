@@ -2513,13 +2513,13 @@ class KafkaApisTest {
     val leaderEpoch = 0
     val tp0 = new TopicPartition("tp", 0)
 
+    setupBasicMetadataCache(tp0.topic, numPartitions = 1, Uuid.randomUuid())
+    val hw = 3
+
     val fetchData = Collections.singletonMap(tp0, new FetchRequest.PartitionData(0, 0, Int.MaxValue, Optional.of(leaderEpoch)))
     val fetchFromFollower = buildRequest(new FetchRequest.Builder(
       ApiKeys.FETCH.oldestVersion(), ApiKeys.FETCH.latestVersion(), 1, 1000, 0, fetchData,
         metadataCache.getTopicIds().asJava).build())
-
-    setupBasicMetadataCache(tp0.topic, numPartitions = 1)
-    val hw = 3
 
     val records = MemoryRecords.withRecords(CompressionType.NONE,
       new SimpleRecord(1000, "foo".getBytes(StandardCharsets.UTF_8)))
@@ -2996,7 +2996,7 @@ class KafkaApisTest {
     capturedResponse
   }
 
-  private def createBasicMetadataRequest(topic: String, numPartitions: Int, brokerEpoch: Long): UpdateMetadataRequest = {
+  private def createBasicMetadataRequest(topic: String, numPartitions: Int, brokerEpoch: Long, topicId: Uuid = Uuid.ZERO_UUID): UpdateMetadataRequest = {
     val replicas = List(0.asInstanceOf[Integer]).asJava
 
     def createPartitionState(partition: Int) = new UpdateMetadataPartitionState()
@@ -3020,11 +3020,11 @@ class KafkaApisTest {
         .setListener(plaintextListener.value)).asJava)
     val partitionStates = (0 until numPartitions).map(createPartitionState)
     new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion, 0,
-      0, brokerEpoch, partitionStates.asJava, Seq(broker).asJava, Collections.emptyMap()).build()
+      0, brokerEpoch, partitionStates.asJava, Seq(broker).asJava, Collections.singletonMap(topic, topicId)).build()
   }
 
-  private def setupBasicMetadataCache(topic: String, numPartitions: Int): Unit = {
-    val updateMetadataRequest = createBasicMetadataRequest(topic, numPartitions, 0)
+  private def setupBasicMetadataCache(topic: String, numPartitions: Int, topicId: Uuid = Uuid.ZERO_UUID): Unit = {
+    val updateMetadataRequest = createBasicMetadataRequest(topic, numPartitions, 0, topicId)
     metadataCache.updateMetadata(correlationId = 0, updateMetadataRequest)
   }
 

@@ -17,6 +17,7 @@
 package org.apache.kafka.clients.producer.internals;
 
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
@@ -61,7 +62,7 @@ public class ProducerMetadataTest {
         String topic = "my-topic";
         metadata.add(topic, time);
 
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.emptySet()), false, time);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.emptySet(), Collections.emptyMap()), false, time);
         assertTrue("No update needed.", metadata.timeToNextUpdate(time) > 0);
         metadata.requestUpdate();
         assertTrue("Still no updated needed due to backoff", metadata.timeToNextUpdate(time) > 0);
@@ -196,9 +197,11 @@ public class ProducerMetadataTest {
     @Test
     public void testMetadataPartialUpdate() {
         long now = 10000;
+        Map<String, Uuid> topicIds = new HashMap<>();
 
         // Add a new topic and fetch its metadata in a partial update.
         final String topic1 = "topic-one";
+        topicIds.put(topic1, Uuid.randomUuid());
         metadata.add(topic1, now);
         assertTrue(metadata.updateRequested());
         assertEquals(0, metadata.timeToNextUpdate(now));
@@ -207,7 +210,7 @@ public class ProducerMetadataTest {
 
         // Perform the partial update. Verify the topic is no longer considered "new".
         now += 1000;
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1)), true, now);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1), topicIds), true, now);
         assertFalse(metadata.updateRequested());
         assertEquals(metadata.topics(), Collections.singleton(topic1));
         assertEquals(metadata.newTopics(), Collections.emptySet());
@@ -222,10 +225,12 @@ public class ProducerMetadataTest {
         // Add two new topics. However, we'll only apply a partial update for one of them.
         now += 1000;
         final String topic2 = "topic-two";
+        topicIds.put(topic2, Uuid.randomUuid());
         metadata.add(topic2, now);
 
         now += 1000;
         final String topic3 = "topic-three";
+        topicIds.put(topic3, Uuid.randomUuid());
         metadata.add(topic3, now);
 
         assertTrue(metadata.updateRequested());
@@ -236,7 +241,7 @@ public class ProducerMetadataTest {
         // Perform the partial update for a subset of the new topics.
         now += 1000;
         assertTrue(metadata.updateRequested());
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic2)), true, now);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic2), topicIds), true, now);
         assertEquals(metadata.topics(), new HashSet<>(Arrays.asList(topic1, topic2, topic3)));
         assertEquals(metadata.newTopics(), Collections.singleton(topic3));
     }
@@ -244,9 +249,12 @@ public class ProducerMetadataTest {
     @Test
     public void testRequestUpdateForTopic() {
         long now = 10000;
+        Map<String, Uuid> topicIds = new HashMap<>();
 
         final String topic1 = "topic-1";
         final String topic2 = "topic-2";
+        topicIds.put(topic1, Uuid.randomUuid());
+        topicIds.put(topic2, Uuid.randomUuid());
 
         // Add the topics to the metadata.
         metadata.add(topic1, now);
@@ -260,7 +268,7 @@ public class ProducerMetadataTest {
 
         // Perform the partial update. Verify no additional (full) updates are requested.
         now += 1000;
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1)), true, now);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1), topicIds), true, now);
         assertFalse(metadata.updateRequested());
 
         // Request an update for topic1 again. Such a request may occur when the leader
@@ -270,24 +278,24 @@ public class ProducerMetadataTest {
 
         // Perform a partial update for the topic. This should not clear the full update.
         now += 1000;
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1)), true, now);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(Collections.singleton(topic1), topicIds), true, now);
         assertTrue(metadata.updateRequested());
 
         // Perform the full update. This should clear the update request.
         now += 1000;
-        metadata.updateWithCurrentRequestVersion(responseWithTopics(new HashSet<>(Arrays.asList(topic1, topic2))), false, now);
+        metadata.updateWithCurrentRequestVersion(responseWithTopics(new HashSet<>(Arrays.asList(topic1, topic2)), topicIds), false, now);
         assertFalse(metadata.updateRequested());
     }
 
     private MetadataResponse responseWithCurrentTopics() {
-        return responseWithTopics(metadata.topics());
+        return responseWithTopics(metadata.topics(), metadata.topicIds());
     }
 
-    private MetadataResponse responseWithTopics(Set<String> topics) {
+    private MetadataResponse responseWithTopics(Set<String> topics, Map<String, Uuid> topicIds) {
         Map<String, Integer> partitionCounts = new HashMap<>();
         for (String topic : topics)
             partitionCounts.put(topic, 1);
-        return RequestTestUtils.metadataUpdateWith(1, partitionCounts);
+        return RequestTestUtils.metadataUpdateWith(1, partitionCounts, topicIds);
     }
 
     private void clearBackgroundError() {

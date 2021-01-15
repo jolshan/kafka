@@ -197,12 +197,13 @@ public class FetchSessionHandlerTest {
         assertEquals(INVALID_SESSION_ID, data.metadata().sessionId());
         assertEquals(INITIAL_EPOCH, data.metadata().epoch());
 
+        topicNames.put(Uuid.randomUuid(), "foo");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 0, 0),
                     new RespEntry("foo", 1, 0, 0)),
                 topicNames,
             0, INVALID_SESSION_ID);
-        handler.handleResponse(resp);
+        handler.handleResponse(resp, topicNames);
 
         FetchSessionHandler.Builder builder2 = handler.newBuilder();
         builder2.add(new TopicPartition("foo", 0),
@@ -232,11 +233,12 @@ public class FetchSessionHandlerTest {
         assertEquals(INVALID_SESSION_ID, data.metadata().sessionId());
         assertEquals(INITIAL_EPOCH, data.metadata().epoch());
 
+        topicNames.put(Uuid.randomUuid(), "foo");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20)),
             topicNames, 0, 123);
-        handler.handleResponse(resp);
+        handler.handleResponse(resp, topicNames);
 
         // Test an incremental fetch request which adds one partition and modifies another.
         FetchSessionHandler.Builder builder2 = handler.newBuilder();
@@ -256,16 +258,17 @@ public class FetchSessionHandlerTest {
                 new ReqEntry("foo", 1, 10, 120, 210)),
             data2.toSend());
 
+        topicNames.put(Uuid.randomUuid(), "bar");
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 1, 20, 20)),
                 topicNames, 0, 123);
-        handler.handleResponse(resp2);
+        handler.handleResponse(resp2, topicNames);
 
         // Skip building a new request.  Test that handling an invalid fetch session epoch response results
         // in a request which closes the session.
         FetchResponse<MemoryRecords> resp3 = new FetchResponse<>(Errors.INVALID_FETCH_SESSION_EPOCH, respMap(),
             topicNames, 0, INVALID_SESSION_ID);
-        handler.handleResponse(resp3);
+        handler.handleResponse(resp3, topicNames);
 
         FetchSessionHandler.Builder builder4 = handler.newBuilder();
         builder4.add(new TopicPartition("foo", 0),
@@ -319,12 +322,14 @@ public class FetchSessionHandlerTest {
             data.toSend(), data.sessionPartitions());
         assertTrue(data.metadata().isFull());
 
+        topicNames.put(Uuid.randomUuid(), "foo");
+        topicNames.put(Uuid.randomUuid(), "bar");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20),
                     new RespEntry("bar", 0, 10, 20)),
             topicNames, 0, 123);
-        handler.handleResponse(resp);
+        handler.handleResponse(resp, topicNames);
 
         // Test an incremental fetch request which removes two partitions.
         FetchSessionHandler.Builder builder2 = handler.newBuilder();
@@ -346,7 +351,7 @@ public class FetchSessionHandlerTest {
         // The next request is a session establishing FULL request.
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.FETCH_SESSION_ID_NOT_FOUND,
             respMap(), topicNames, 0, INVALID_SESSION_ID);
-        handler.handleResponse(resp2);
+        handler.handleResponse(resp2, topicNames);
         FetchSessionHandler.Builder builder3 = handler.newBuilder();
         builder3.add(new TopicPartition("foo", 0),
             new FetchRequest.PartitionData(0, 100, 200, Optional.empty()));
@@ -361,11 +366,13 @@ public class FetchSessionHandlerTest {
     @Test
     public void testVerifyFullFetchResponsePartitions() throws Exception {
         FetchSessionHandler handler = new FetchSessionHandler(LOG_CONTEXT, 1);
+        topicNames.put(Uuid.randomUuid(), "foo");
+        topicNames.put(Uuid.randomUuid(), "bar");
         String issue = handler.verifyFullFetchResponsePartitions(new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertTrue(issue.contains("extra"));
         assertFalse(issue.contains("omitted"));
         FetchSessionHandler.Builder builder = handler.newBuilder();
@@ -380,12 +387,12 @@ public class FetchSessionHandlerTest {
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertTrue(issue2 == null);
         String issue3 = handler.verifyFullFetchResponsePartitions(new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID));
+            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertFalse(issue3.contains("extra"));
         assertTrue(issue3.contains("omitted"));
     }

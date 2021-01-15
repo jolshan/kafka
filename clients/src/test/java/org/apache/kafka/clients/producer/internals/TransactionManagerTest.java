@@ -33,6 +33,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.GroupAuthorizationException;
 import org.apache.kafka.common.errors.OutOfOrderSequenceException;
 import org.apache.kafka.common.errors.ProducerFencedException;
@@ -146,7 +147,7 @@ public class TransactionManagerTest {
     @Before
     public void setup() {
         this.metadata.add("test", time.milliseconds());
-        this.client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap("test", 2)));
+        this.client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap("test", 2), singletonMap("test", Uuid.randomUuid())));
         this.brokerNode = new Node(0, "localhost", 2211);
 
         initializeTransactionManager(Optional.of(transactionalId), false);

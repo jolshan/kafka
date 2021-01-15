@@ -25,8 +25,8 @@ import kafka.log.{Log, LogAppendInfo, LogManager}
 import kafka.server.QuotaFactory.UnboundedQuota
 import kafka.server.epoch.util.ReplicaFetcherMockBlockingSend
 import kafka.utils.TestUtils
-import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.message.FetchResponseData
+import org.apache.kafka.common.{TopicPartition, Uuid}
+import org.apache.kafka.common.message.{FetchResponseData, UpdateMetadataRequestData}
 import org.apache.kafka.common.message.OffsetForLeaderEpochRequestData.OffsetForLeaderPartition
 import org.apache.kafka.common.message.OffsetForLeaderEpochResponseData.EpochEndOffset
 import org.apache.kafka.common.metrics.Metrics
@@ -34,7 +34,7 @@ import org.apache.kafka.common.protocol.Errors._
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.record.{CompressionType, MemoryRecords, Records, SimpleRecord}
 import org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.{UNDEFINED_EPOCH, UNDEFINED_EPOCH_OFFSET}
-import org.apache.kafka.common.requests.FetchResponse
+import org.apache.kafka.common.requests.{FetchResponse, UpdateMetadataRequest}
 import org.apache.kafka.common.utils.SystemTime
 import org.easymock.EasyMock._
 import org.easymock.{Capture, CaptureType}
@@ -50,8 +50,33 @@ class ReplicaFetcherThreadTest {
   private val t1p1 = new TopicPartition("topic1", 1)
   private val t2p1 = new TopicPartition("topic2", 1)
 
+  private val topicId1 = Uuid.randomUuid()
+  private val topicId2 = Uuid.randomUuid()
+
+  private val topicIds = Map("topic1" -> topicId1, "topic2" -> topicId2)
+
   private val brokerEndPoint = new BrokerEndPoint(0, "localhost", 1000)
   private val failedPartitions = new FailedPartitions
+
+  private val partitionStates = List(
+    new UpdateMetadataRequestData.UpdateMetadataPartitionState()
+      .setTopicName("topic1")
+      .setPartitionIndex(0)
+      .setControllerEpoch(0)
+      .setLeader(0)
+      .setLeaderEpoch(0),
+    new UpdateMetadataRequestData.UpdateMetadataPartitionState()
+      .setTopicName("topic2")
+      .setPartitionIndex(0)
+      .setControllerEpoch(0)
+      .setLeader(0)
+      .setLeaderEpoch(0),
+  ).asJava
+
+  private val updateMetadataRequest = new UpdateMetadataRequest.Builder(ApiKeys.UPDATE_METADATA.latestVersion(),
+    0, 0, 0, partitionStates, Collections.emptyList(), topicIds.asJava).build()
+  private val metadataCache = new MetadataCache(0)
+  metadataCache.updateMetadata(0, updateMetadataRequest)
 
   private def initialFetchState(fetchOffset: Long, leaderEpoch: Int = 1): InitialFetchState = {
     InitialFetchState(leader = new BrokerEndPoint(0, "localhost", 9092),
@@ -109,6 +134,7 @@ class ReplicaFetcherThreadTest {
     expect(log.latestEpoch).andReturn(None).once()  // t2p1 doesnt support epochs
     expect(log.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(0, leaderEpoch))).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
     expect(replicaManager.brokerTopicStats).andReturn(mock(classOf[BrokerTopicStats]))
@@ -257,6 +283,7 @@ class ReplicaFetcherThreadTest {
     expect(log.latestEpoch).andReturn(Some(leaderEpoch)).anyTimes()
     expect(log.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(0, leaderEpoch))).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
     expect(replicaManager.brokerTopicStats).andReturn(mock(classOf[BrokerTopicStats]))
@@ -323,6 +350,7 @@ class ReplicaFetcherThreadTest {
     expect(log.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(initialLEO, leaderEpoch))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -377,6 +405,7 @@ class ReplicaFetcherThreadTest {
     expect(log.latestEpoch).andReturn(Some(leaderEpochAtFollower)).anyTimes()
     expect(log.endOffsetForEpoch(leaderEpochAtLeader)).andReturn(None).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -434,6 +463,7 @@ class ReplicaFetcherThreadTest {
     expect(log.endOffsetForEpoch(3)).andReturn(
       Some(OffsetAndEpoch(120, 3))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -511,6 +541,7 @@ class ReplicaFetcherThreadTest {
     expect(log.endOffsetForEpoch(3)).andReturn(Some(OffsetAndEpoch(129, 2))).anyTimes()
     expect(log.endOffsetForEpoch(2)).andReturn(Some(OffsetAndEpoch(119, 1))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -614,6 +645,7 @@ class ReplicaFetcherThreadTest {
     expect(log.endOffsetForEpoch(3)).andReturn(
       Some(OffsetAndEpoch(120, 3))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -675,6 +707,7 @@ class ReplicaFetcherThreadTest {
     expect(partition.localLogOrException).andReturn(log).anyTimes()
     expect(log.highWatermark).andReturn(initialFetchOffset).anyTimes()
     expect(log.latestEpoch).andReturn(Some(5)).times(2)
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
     expect(replicaManager.brokerTopicStats).andReturn(mock(classOf[BrokerTopicStats]))
@@ -725,6 +758,7 @@ class ReplicaFetcherThreadTest {
     expect(log.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(initialLeo, leaderEpoch))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLeo).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
@@ -781,6 +815,7 @@ class ReplicaFetcherThreadTest {
     expect(log.latestEpoch).andReturn(Some(leaderEpoch)).anyTimes()
     expect(log.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(0, leaderEpoch))).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()
     stub(partition, replicaManager, log)
@@ -833,6 +868,7 @@ class ReplicaFetcherThreadTest {
     expect(log.latestEpoch).andReturn(Some(5)).anyTimes()
     expect(log.endOffsetForEpoch(5)).andReturn(Some(OffsetAndEpoch(initialLEO, 5))).anyTimes()
     expect(log.logEndOffset).andReturn(initialLEO).anyTimes()
+    expect(replicaManager.metadataCache).andStubReturn(metadataCache)
     expect(replicaManager.localLogOrException(anyObject(classOf[TopicPartition]))).andReturn(log).anyTimes()
     expect(replicaManager.logManager).andReturn(logManager).anyTimes()
     expect(replicaManager.replicaAlterLogDirsManager).andReturn(replicaAlterLogDirsManager).anyTimes()

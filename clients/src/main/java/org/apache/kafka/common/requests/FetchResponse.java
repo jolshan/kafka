@@ -386,8 +386,12 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
                 }
             });
         } else {
-            inOrderTopicNames.forEach((id, name) -> {
-                if (name == null) {
+            Map.Entry<TopicPartition, PartitionData<T>> part = null;
+            if (partIterator.hasNext())
+                part = partIterator.next();
+            // For each entry the key is the id and the name is the value.
+            for (Map.Entry<Uuid, String> entry : inOrderTopicNames.entrySet()) {
+                if (entry.getValue() == null) {
                     List<FetchResponseData.FetchablePartitionResponse> partitionResponses = Collections.singletonList(
                             new FetchResponseData.FetchablePartitionResponse()
                             // update with correct error code
@@ -400,29 +404,36 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
                             .setPreferredReadReplica(FetchResponse.INVALID_PREFERRED_REPLICA_ID)
                             .setRecordSet(MemoryRecords.EMPTY));
                     topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                            .setTopicId(id)
+                            .setTopicId(entry.getKey())
                             .setPartitionResponses(partitionResponses));
                 } else {
-                    Map.Entry<TopicPartition, PartitionData<T>> part = partIterator.next();
-                    PartitionData<T> partitionData = part.getValue();
-                    // Since PartitionData alone doesn't know the partition ID, we set it here
-                    partitionData.partitionResponse.setPartition(part.getKey().partition());
-                    // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
-                    // batch is in the same topic group.
-                    FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
-                            : topicResponseList.get(topicResponseList.size() - 1);
-                    if (previousTopic != null && previousTopic.topic().equals(part.getKey().topic()))
-                        previousTopic.partitionResponses().add(partitionData.partitionResponse);
-                    else {
-                        List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
-                        partitionResponses.add(partitionData.partitionResponse);
-                        topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                                .setTopic(part.getKey().topic())
-                                .setTopicId(id)
-                                .setPartitionResponses(partitionResponses));
+                    // While there are still partitions that match the given topic name
+                    // If the topic name does not match, the entry will stay in the part variable until it is time for the topic.
+                    while (part != null && part.getKey().topic().equals(entry.getValue())) {
+                        PartitionData<T> partitionData = part.getValue();
+                        // Since PartitionData alone doesn't know the partition ID, we set it here
+                        partitionData.partitionResponse.setPartition(part.getKey().partition());
+                        // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
+                        // batch is in the same topic group.
+                        FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
+                                : topicResponseList.get(topicResponseList.size() - 1);
+                        if (previousTopic != null && previousTopic.topic().equals(part.getKey().topic()))
+                            previousTopic.partitionResponses().add(partitionData.partitionResponse);
+                        else {
+                            List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
+                            partitionResponses.add(partitionData.partitionResponse);
+                            topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                                    .setTopic(part.getKey().topic())
+                                    .setTopicId(entry.getKey())
+                                    .setPartitionResponses(partitionResponses));
+                        }
+                        if (partIterator.hasNext())
+                            part = partIterator.next();
+                        else
+                            part = null;
                     }
                 }
-            });
+            }
         }
 
         return new FetchResponseData()
