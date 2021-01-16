@@ -28,7 +28,6 @@ import org.apache.kafka.common.record.MemoryRecords;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -261,6 +260,36 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
         }
     }
 
+    public static final class IdError {
+        private final Uuid id;
+        private final List<FetchResponseData.FetchablePartitionResponse> errorData;
+
+        public IdError(Uuid id,
+                List<Integer> partitions,
+                Errors error) {
+            this.id = id;
+
+            this.errorData = partitions.stream().map(partition -> new FetchResponseData.FetchablePartitionResponse()
+                    .setPartition(partition)
+                    .setErrorCode(error.code())
+                    .setHighWatermark(FetchResponse.INVALID_HIGHWATERMARK)
+                    .setLastStableOffset(FetchResponse.INVALID_LAST_STABLE_OFFSET)
+                    .setLogStartOffset(FetchResponse.INVALID_LOG_START_OFFSET)
+                    .setAbortedTransactions(null)
+                    .setPreferredReadReplica(FetchResponse.INVALID_PREFERRED_REPLICA_ID)
+                    .setRecordSet(MemoryRecords.EMPTY)).collect(Collectors.toList());
+        }
+
+        public Uuid id() {
+            return this.id;
+        }
+
+        public List<FetchResponseData.FetchablePartitionResponse> errorData() {
+            return this.errorData;
+        }
+
+    }
+
     /**
      * From version 3 or later, the entries in `responseData` should be in the same order as the entries in
      * `FetchRequest.fetchData`.
@@ -272,11 +301,12 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
      */
     public FetchResponse(Errors error,
                          LinkedHashMap<TopicPartition, PartitionData<T>> responseData,
-                         LinkedHashMap<Uuid, String> inOrderTopicNames,
+                         List<IdError> idErrors,
+                         Map<String, Uuid> topicIds,
                          int throttleTimeMs,
                          int sessionId) {
         super(ApiKeys.FETCH);
-        this.data = toMessage(throttleTimeMs, error, responseData.entrySet().iterator(), inOrderTopicNames, sessionId);
+        this.data = toMessage(throttleTimeMs, error, responseData.entrySet().iterator(), idErrors, topicIds, sessionId);
         this.responseDataMap = responseData;
     }
 
@@ -363,78 +393,37 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
 
     private static <T extends BaseRecords> FetchResponseData toMessage(int throttleTimeMs, Errors error,
                                                                        Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator,
-                                                                       LinkedHashMap<Uuid, String> inOrderTopicNames,
+                                                                       List<IdError> idErrors,
+                                                                       Map<String, Uuid> topicIds,
                                                                        int sessionId) {
         List<FetchResponseData.FetchableTopicResponse> topicResponseList = new ArrayList<>();
-        if (inOrderTopicNames.isEmpty()) {
-            partIterator.forEachRemaining(entry -> {
-                PartitionData<T> partitionData = entry.getValue();
-                // Since PartitionData alone doesn't know the partition ID, we set it here
-                partitionData.partitionResponse.setPartition(entry.getKey().partition());
-                // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
-                // batch is in the same topic group.
-                FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
-                        : topicResponseList.get(topicResponseList.size() - 1);
-                if (previousTopic != null && previousTopic.topic().equals(entry.getKey().topic()))
-                    previousTopic.partitionResponses().add(partitionData.partitionResponse);
-                else {
-                    List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
-                    partitionResponses.add(partitionData.partitionResponse);
-                    topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                            .setTopic(entry.getKey().topic())
-                            .setPartitionResponses(partitionResponses));
-                }
-            });
-        } else {
-            Map.Entry<TopicPartition, PartitionData<T>> part = null;
-            if (partIterator.hasNext())
-                part = partIterator.next();
-            // For each entry the key is the id and the name is the value.
-            for (Map.Entry<Uuid, String> entry : inOrderTopicNames.entrySet()) {
-                if (entry.getValue() == null) {
-                    List<FetchResponseData.FetchablePartitionResponse> partitionResponses = Collections.singletonList(
-                            new FetchResponseData.FetchablePartitionResponse()
-                            // update with correct error code
-                            .setPartition(-1)
-                            .setErrorCode(Errors.UNKNOWN_TOPIC_OR_PARTITION.code())
-                            .setHighWatermark(FetchResponse.INVALID_HIGHWATERMARK)
-                            .setLastStableOffset(FetchResponse.INVALID_LAST_STABLE_OFFSET)
-                            .setLogStartOffset(FetchResponse.INVALID_LOG_START_OFFSET)
-                            .setAbortedTransactions(null)
-                            .setPreferredReadReplica(FetchResponse.INVALID_PREFERRED_REPLICA_ID)
-                            .setRecordSet(MemoryRecords.EMPTY));
-                    topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                            .setTopicId(entry.getKey())
-                            .setPartitionResponses(partitionResponses));
-                } else {
-                    // While there are still partitions that match the given topic name
-                    // If the topic name does not match, the entry will stay in the part variable until it is time for the topic.
-                    while (part != null && part.getKey().topic().equals(entry.getValue())) {
-                        PartitionData<T> partitionData = part.getValue();
-                        // Since PartitionData alone doesn't know the partition ID, we set it here
-                        partitionData.partitionResponse.setPartition(part.getKey().partition());
-                        // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
-                        // batch is in the same topic group.
-                        FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
-                                : topicResponseList.get(topicResponseList.size() - 1);
-                        if (previousTopic != null && previousTopic.topic().equals(part.getKey().topic()))
-                            previousTopic.partitionResponses().add(partitionData.partitionResponse);
-                        else {
-                            List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
-                            partitionResponses.add(partitionData.partitionResponse);
-                            topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
-                                    .setTopic(part.getKey().topic())
-                                    .setTopicId(entry.getKey())
-                                    .setPartitionResponses(partitionResponses));
-                        }
-                        if (partIterator.hasNext())
-                            part = partIterator.next();
-                        else
-                            part = null;
-                    }
-                }
+        partIterator.forEachRemaining(entry -> {
+            PartitionData<T> partitionData = entry.getValue();
+            // Since PartitionData alone doesn't know the partition ID, we set it here
+            partitionData.partitionResponse.setPartition(entry.getKey().partition());
+            // We have to keep the order of input topic-partition. Hence, we batch the partitions only if the last
+            // batch is in the same topic group.
+            FetchResponseData.FetchableTopicResponse previousTopic = topicResponseList.isEmpty() ? null
+                    : topicResponseList.get(topicResponseList.size() - 1);
+            if (previousTopic != null && previousTopic.topic().equals(entry.getKey().topic()))
+                previousTopic.partitionResponses().add(partitionData.partitionResponse);
+            else {
+                List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
+                partitionResponses.add(partitionData.partitionResponse);
+                topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                        .setTopic(entry.getKey().topic())
+                        .setTopicId(topicIds.getOrDefault(entry.getKey().topic(), Uuid.ZERO_UUID))
+                        .setPartitionResponses(partitionResponses));
             }
-        }
+        });
+        // ID errors will be empty unless topic IDs are supported and there were topic ID errors
+        idErrors.forEach(idError -> {
+            List<FetchResponseData.FetchablePartitionResponse> partitionResponses = new ArrayList<>();
+            partitionResponses.addAll(idError.errorData);
+            topicResponseList.add(new FetchResponseData.FetchableTopicResponse()
+                    .setTopicId(idError.id())
+                    .setPartitionResponses(partitionResponses));
+        });
 
         return new FetchResponseData()
                 .setThrottleTimeMs(throttleTimeMs)
@@ -457,10 +446,11 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
      */
     public static <T extends BaseRecords> int sizeOf(short version,
                                                      Iterator<Map.Entry<TopicPartition, PartitionData<T>>> partIterator,
-                                                     LinkedHashMap<Uuid, String> inOrderTopicNames) {
+                                                     List<IdError> idErrors,
+                                                     Map<String, Uuid> topicIds) {
         // Since the throttleTimeMs and metadata field sizes are constant and fixed, we can
         // use arbitrary values here without affecting the result.
-        FetchResponseData data = toMessage(0, Errors.NONE, partIterator, inOrderTopicNames, INVALID_SESSION_ID);
+        FetchResponseData data = toMessage(0, Errors.NONE, partIterator, idErrors, topicIds, INVALID_SESSION_ID);
         ObjectSerializationCache cache = new ObjectSerializationCache();
         return 4 + data.size(cache, version);
     }

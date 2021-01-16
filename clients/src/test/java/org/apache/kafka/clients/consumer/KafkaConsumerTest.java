@@ -2257,7 +2257,6 @@ public class KafkaConsumerTest {
 
     private FetchResponse<MemoryRecords> fetchResponse(Map<TopicPartition, FetchInfo> fetches) {
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> tpResponses = new LinkedHashMap<>();
-        LinkedHashMap<Uuid, String> inOrderTopicNames = new LinkedHashMap<>();
         for (Map.Entry<TopicPartition, FetchInfo> fetchEntry : fetches.entrySet()) {
             TopicPartition partition = fetchEntry.getKey();
             long fetchOffset = fetchEntry.getValue().offset;
@@ -2275,9 +2274,8 @@ public class KafkaConsumerTest {
             tpResponses.put(partition, new FetchResponse.PartitionData<>(
                     Errors.NONE, 0, FetchResponse.INVALID_LAST_STABLE_OFFSET,
                     0L, null, records));
-            inOrderTopicNames.putIfAbsent(topicIds.get(partition.topic()), partition.topic());
         }
-        return new FetchResponse<>(Errors.NONE, tpResponses, inOrderTopicNames,
+        return new FetchResponse<>(Errors.NONE, tpResponses, Collections.emptyList(), topicIds,
                 0, INVALID_SESSION_ID);
     }
 

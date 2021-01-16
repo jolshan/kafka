@@ -34,6 +34,7 @@ import org.apache.kafka.common.utils.{SystemTime, Time}
 import org.apache.kafka.common.{Node, TopicPartition, Uuid}
 
 import scala.collection.Map
+import scala.jdk.CollectionConverters._
 
 /**
   * Stub network client used for testing the ReplicaFetcher, wraps the MockClient used for consumer testing
@@ -105,12 +106,9 @@ class ReplicaFetcherMockBlockingSend(offsets: java.util.Map[TopicPartition, Epoc
       case ApiKeys.FETCH =>
         fetchCount += 1
         val partitionData = new util.LinkedHashMap[TopicPartition, FetchResponse.PartitionData[Records]]
-        val topicNames = new util.LinkedHashMap[Uuid, String]
         fetchPartitionData.foreach { case (tp, data) => partitionData.put(tp, data) }
-        topicIds.foreach { case (name, id) => topicNames.put(id, name) }
         fetchPartitionData = Map.empty
-        topicIds = Map.empty
-        new FetchResponse(Errors.NONE, partitionData, topicNames, 0,
+        new FetchResponse(Errors.NONE, partitionData, Collections.emptyList(), topicIds.asJava, 0,
           if (partitionData.isEmpty) JFetchMetadata.INVALID_SESSION_ID else 1)
 
       case _ =>

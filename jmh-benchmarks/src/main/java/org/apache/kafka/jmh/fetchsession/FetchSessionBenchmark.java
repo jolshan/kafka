@@ -39,7 +39,10 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -71,9 +74,12 @@ public class FetchSessionBenchmark {
         handler = new FetchSessionHandler(LOG_CONTEXT, 1);
         FetchSessionHandler.Builder builder = handler.newBuilder();
 
-        LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
+        Map<Uuid, String> topicNames = new HashMap<>();
+        Map<String, Uuid> topicIds = new HashMap<>();
+        List<FetchResponse.IdError> idErrors = new LinkedList<>();
         Uuid id = Uuid.randomUuid();
         topicNames.put(id, "foo");
+        topicIds.put("foo", id);
 
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> respMap = new LinkedHashMap<>();
         for (int i = 0; i < partitionCount; i++) {
@@ -92,7 +98,7 @@ public class FetchSessionBenchmark {
         }
         builder.build();
         // build and handle an initial response so that the next fetch will be incremental
-        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, topicNames, 0, 1), topicNames);
+        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, idErrors, topicIds, 0, 1), topicNames);
 
         int counter = 0;
         for (TopicPartition topicPartition: new ArrayList<>(fetches.keySet())) {

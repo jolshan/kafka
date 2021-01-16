@@ -83,6 +83,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -140,7 +141,9 @@ public class ReplicaFetcherThreadBenchmark {
                 Time.SYSTEM);
 
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<BaseRecords>> initialFetched = new LinkedHashMap<>();
-        LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
+        HashMap<Uuid, String> topicNames = new HashMap<>();
+        HashMap<String, Uuid> topicIds = new HashMap<>();
+        List<FetchResponse.IdError> idErrors = new LinkedList<>();
         scala.collection.mutable.Map<TopicPartition, InitialFetchState> initialFetchStates = new scala.collection.mutable.HashMap<>();
         for (int i = 0; i < partitionCount; i++) {
             TopicPartition tp = new TopicPartition("topic", i);
@@ -179,7 +182,8 @@ public class ReplicaFetcherThreadBenchmark {
             };
             initialFetched.put(tp, new FetchResponse.PartitionData<>(Errors.NONE, 0, 0, 0,
                     new LinkedList<>(), fetched));
-            topicNames.putIfAbsent(Uuid.randomUuid(), tp.topic());
+            topicIds.putIfAbsent(tp.topic(), Uuid.randomUuid());
+            topicNames.putIfAbsent(topicIds.get(tp.topic()), tp.topic());
         }
 
         ReplicaManager replicaManager = Mockito.mock(ReplicaManager.class);
@@ -190,7 +194,7 @@ public class ReplicaFetcherThreadBenchmark {
         // so that we do not measure this time as part of the steady state work
         fetcher.doWork();
         // handle response to engage the incremental fetch session handler
-        fetcher.fetchSessionHandler().handleResponse(new FetchResponse<>(Errors.NONE, initialFetched, topicNames, 0, 999), topicNames);
+        fetcher.fetchSessionHandler().handleResponse(new FetchResponse<>(Errors.NONE, initialFetched, idErrors, topicIds, 0, 999), topicNames);
     }
 
     @TearDown(Level.Trial)

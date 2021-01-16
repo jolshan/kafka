@@ -65,6 +65,8 @@ public class FetchResponseBenchmark {
 
     LinkedHashMap<Uuid,String> topicNames;
 
+    List<FetchResponse.IdError> idErrors;
+
     ResponseHeader header;
 
     FetchResponse<MemoryRecords> fetchResponse;
@@ -79,6 +81,7 @@ public class FetchResponseBenchmark {
         this.responseData = new LinkedHashMap<>();
         this.topicIds = new HashMap<>();
         this.topicNames = new LinkedHashMap<>();
+        this.idErrors = new LinkedList<>();
         for (int topicIdx = 0; topicIdx < topicCount; topicIdx++) {
             String topic = UUID.randomUUID().toString();
             Uuid id = Uuid.randomUuid();
@@ -92,12 +95,12 @@ public class FetchResponseBenchmark {
         }
 
         this.header = new ResponseHeader(100, ApiKeys.FETCH.responseHeaderVersion(ApiKeys.FETCH.latestVersion()));
-        this.fetchResponse = new FetchResponse<>(Errors.NONE, responseData, topicNames, 0, 0);
+        this.fetchResponse = new FetchResponse<>(Errors.NONE, responseData, idErrors, topicIds, 0, 0);
     }
 
     @Benchmark
     public int testConstructFetchResponse() {
-        FetchResponse<MemoryRecords> fetchResponse = new FetchResponse<>(Errors.NONE, responseData, topicNames, 0, 0);
+        FetchResponse<MemoryRecords> fetchResponse = new FetchResponse<>(Errors.NONE, responseData, idErrors, topicIds, 0, 0);
         return fetchResponse.responseData(topicNames).size();
     }
 

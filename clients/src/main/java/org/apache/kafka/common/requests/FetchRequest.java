@@ -346,14 +346,13 @@ public class FetchRequest extends AbstractRequest {
         Errors error = Errors.forException(e);
         if (version() < 13) {
             LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> responseData = new LinkedHashMap<>();
-            LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
             for (Map.Entry<TopicPartition, PartitionData> entry : fetchData.entrySet()) {
                 FetchResponse.PartitionData<MemoryRecords> partitionResponse = new FetchResponse.PartitionData<>(error,
                         FetchResponse.INVALID_HIGHWATERMARK, FetchResponse.INVALID_LAST_STABLE_OFFSET,
                         FetchResponse.INVALID_LOG_START_OFFSET, Optional.empty(), null, MemoryRecords.EMPTY);
                 responseData.put(entry.getKey(), partitionResponse);
             }
-            return new FetchResponse<>(error, responseData, topicNames, throttleTimeMs, data.sessionId());
+            return new FetchResponse<>(error, responseData, Collections.emptyList(), Collections.emptyMap(), throttleTimeMs, data.sessionId());
         }
         List<FetchResponseData.FetchableTopicResponse> topicResponseList = new ArrayList<>();
         data.topics().forEach(topic -> {

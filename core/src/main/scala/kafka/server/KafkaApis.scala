@@ -716,7 +716,6 @@ class KafkaApis(val requestChannel: RequestChannel,
       fetchRequest.fetchData(topicNames),
       fetchRequest.toForget(topicNames),
       fetchRequest.isFromFollower)
-    val inOrderTopicNames = new util.LinkedHashMap[Uuid, String]
 
 
     val clientMetadata: Option[ClientMetadata] = if (versionId >= 11) {
@@ -739,16 +738,15 @@ class KafkaApis(val requestChannel: RequestChannel,
 
     val erroneous = mutable.ArrayBuffer[(TopicPartition, FetchResponse.PartitionData[Records])]()
     val interesting = mutable.ArrayBuffer[(TopicPartition, FetchRequest.PartitionData)]()
+    val idErrors = new mutable.ListBuffer[FetchResponse.IdError]()
     if (fetchRequest.isFromFollower) {
       // The follower must have ClusterAction on ClusterResource in order to fetch partition data.
       if (authorize(request.context, CLUSTER_ACTION, CLUSTER, CLUSTER_NAME)) {
         fetchContext.foreachPartition { (topicPartition, data) =>
           if (!metadataCache.contains(topicPartition))
             erroneous += topicPartition -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-          else {
+          else
             interesting += (topicPartition -> data)
-            if (fetchRequest.version() >= 13) inOrderTopicNames.put(topicIds.get(topicPartition.topic()), topicPartition.topic())
-          }
         }
       } else {
         fetchContext.foreachPartition { (part, _) =>
@@ -767,21 +765,18 @@ class KafkaApis(val requestChannel: RequestChannel,
           erroneous += topicPartition -> errorResponse(Errors.TOPIC_AUTHORIZATION_FAILED)
         else if (!metadataCache.contains(topicPartition))
           erroneous += topicPartition -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-        else {
+        else
           interesting += (topicPartition -> data)
-          if (fetchRequest.version() >= 13) inOrderTopicNames.put(topicIds.get(topicPartition.topic()), topicPartition.topic())
-        }
       }
     }
 
     if (fetchRequest.version() >= 13) {
       fetchRequest.data().topics().forEach { topic =>
         val name = topicNames.get(topic.topicId())
-        //if (name == null) {
-        // CHANGE TO UNKNOWN TOPIC ID ONCE ADDED
-        //  topicErrors += topic.topicId() -> errorResponse(Errors.UNKNOWN_TOPIC_OR_PARTITION)
-        //}
-        inOrderTopicNames.putIfAbsent(topic.topicId(), name)
+        if (name == null) {
+          idErrors += new FetchResponse.IdError(topic.topicId(), topic.partitions().asScala.map(part => new Integer(part.partition())).asJava,
+            Errors.UNKNOWN_TOPIC_OR_PARTITION)
+        }
       }
     }
 
@@ -896,7 +891,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
 
         // Prepare fetch response from converted data
-        val response = new FetchResponse(unconvertedFetchResponse.error, convertedData, inOrderTopicNames, throttleTimeMs,
+        val response = new FetchResponse(unconvertedFetchResponse.error, convertedData, idErrors.asJava, topicIds, throttleTimeMs,
           unconvertedFetchResponse.sessionId)
         // record the bytes out metrics only when the response is being sent
         response.responseData(topicNames).forEach { (tp, data) =>
@@ -918,7 +913,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       if (fetchRequest.isFromFollower) {
         // We've already evaluated against the quota and are good to go. Just need to record it now.
         unconvertedFetchResponse = fetchContext.updateAndGenerateResponseData(partitions)
-        val responseSize = KafkaApis.sizeOfThrottledPartitions(versionId, unconvertedFetchResponse, quotas.leader, inOrderTopicNames)
+        val responseSize = KafkaApis.sizeOfThrottledPartitions(versionId, unconvertedFetchResponse, quotas.leader, idErrors.toList, topicNames, topicIds)
         quotas.leader.record(responseSize)
         trace(s"Sending Fetch response with partitions.size=${unconvertedFetchResponse.responseData(topicNames).size}, " +
           s"metadata=${unconvertedFetchResponse.sessionId}")
@@ -931,7 +926,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         // Record both bandwidth and request quota-specific values and throttle by muting the channel if any of the
         // quotas have been violated. If both quotas have been violated, use the max throttle time between the two
         // quotas. When throttled, we unrecord the recorded bandwidth quota value
-        val responseSize = fetchContext.getResponseSize(partitions, versionId, inOrderTopicNames)
+        val responseSize = fetchContext.getResponseSize(partitions, versionId, idErrors.asJava, topicIds)
         val timeMs = time.milliseconds()
         val requestThrottleTimeMs = quotas.request.maybeRecordAndGetThrottleTimeMs(request, timeMs)
         val bandwidthThrottleTimeMs = quotas.fetch.maybeRecordAndGetThrottleTimeMs(request, responseSize, timeMs)
@@ -3523,11 +3518,13 @@ class KafkaApis(val requestChannel: RequestChannel,
 object KafkaApis {
   // Traffic from both in-sync and out of sync replicas are accounted for in replication quota to ensure total replication
   // traffic doesn't exceed quota.
-  private[server] def sizeOfThrottledPartitions(versionId: Short,
+  private[server] def sizeOfThrottledPartitions[T >: MemoryRecords <: BaseRecords](versionId: Short,
                                                 unconvertedResponse: FetchResponse[Records],
                                                 quota: ReplicationQuotaManager,
-                                                inOrderTopicNames: util.LinkedHashMap[Uuid, String]): Int = {
-    FetchResponse.sizeOf(versionId, unconvertedResponse.responseData(inOrderTopicNames).entrySet
-      .iterator.asScala.filter(element => quota.isThrottled(element.getKey)).asJava, inOrderTopicNames)
+                                                idErrors: List[FetchResponse.IdError],
+                                                topicNames: util.Map[Uuid, String],
+                                                topicIds: util.Map[String, Uuid]): Int = {
+    FetchResponse.sizeOf(versionId, unconvertedResponse.responseData(topicNames).entrySet
+      .iterator.asScala.filter(element => quota.isThrottled(element.getKey)).asJava, idErrors.asJava, topicIds)
   }
 }

@@ -29,7 +29,9 @@ import org.junit.rules.Timeout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +56,8 @@ public class FetchSessionHandlerTest {
 
     private static final LogContext LOG_CONTEXT = new LogContext("[FetchSessionHandler]=");
 
-    private static LinkedHashMap<Uuid, String> topicNames = new LinkedHashMap<>();
+    private static Map<Uuid, String> topicNames = new HashMap<>();
+    private static Map<String, Uuid> topicIds = new HashMap<>();
 
     /**
      * Create a set of TopicPartitions.  We use a TreeSet, in order to get a deterministic
@@ -197,11 +200,11 @@ public class FetchSessionHandlerTest {
         assertEquals(INVALID_SESSION_ID, data.metadata().sessionId());
         assertEquals(INITIAL_EPOCH, data.metadata().epoch());
 
-        topicNames.put(Uuid.randomUuid(), "foo");
+        addTopicId("foo");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 0, 0),
                     new RespEntry("foo", 1, 0, 0)),
-                topicNames,
+                Collections.emptyList(), topicIds,
             0, INVALID_SESSION_ID);
         handler.handleResponse(resp, topicNames);
 
@@ -233,11 +236,11 @@ public class FetchSessionHandlerTest {
         assertEquals(INVALID_SESSION_ID, data.metadata().sessionId());
         assertEquals(INITIAL_EPOCH, data.metadata().epoch());
 
-        topicNames.put(Uuid.randomUuid(), "foo");
+        addTopicId("foo");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20)),
-            topicNames, 0, 123);
+            Collections.emptyList(), topicIds, 0, 123);
         handler.handleResponse(resp, topicNames);
 
         // Test an incremental fetch request which adds one partition and modifies another.
@@ -258,16 +261,16 @@ public class FetchSessionHandlerTest {
                 new ReqEntry("foo", 1, 10, 120, 210)),
             data2.toSend());
 
-        topicNames.put(Uuid.randomUuid(), "bar");
+        addTopicId("bar");
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 1, 20, 20)),
-                topicNames, 0, 123);
+                Collections.emptyList(), topicIds, 0, 123);
         handler.handleResponse(resp2, topicNames);
 
         // Skip building a new request.  Test that handling an invalid fetch session epoch response results
         // in a request which closes the session.
         FetchResponse<MemoryRecords> resp3 = new FetchResponse<>(Errors.INVALID_FETCH_SESSION_EPOCH, respMap(),
-            topicNames, 0, INVALID_SESSION_ID);
+            Collections.emptyList(), topicIds, 0, INVALID_SESSION_ID);
         handler.handleResponse(resp3, topicNames);
 
         FetchSessionHandler.Builder builder4 = handler.newBuilder();
@@ -322,13 +325,13 @@ public class FetchSessionHandlerTest {
             data.toSend(), data.sessionPartitions());
         assertTrue(data.metadata().isFull());
 
-        topicNames.put(Uuid.randomUuid(), "foo");
-        topicNames.put(Uuid.randomUuid(), "bar");
+        addTopicId("foo");
+        addTopicId("bar");
         FetchResponse<MemoryRecords> resp = new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                     new RespEntry("foo", 1, 10, 20),
                     new RespEntry("bar", 0, 10, 20)),
-            topicNames, 0, 123);
+                Collections.emptyList(), topicIds, 0, 123);
         handler.handleResponse(resp, topicNames);
 
         // Test an incremental fetch request which removes two partitions.
@@ -350,7 +353,7 @@ public class FetchSessionHandlerTest {
         // A FETCH_SESSION_ID_NOT_FOUND response triggers us to close the session.
         // The next request is a session establishing FULL request.
         FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.FETCH_SESSION_ID_NOT_FOUND,
-            respMap(), topicNames, 0, INVALID_SESSION_ID);
+            respMap(), Collections.emptyList(), topicIds, 0, INVALID_SESSION_ID);
         handler.handleResponse(resp2, topicNames);
         FetchSessionHandler.Builder builder3 = handler.newBuilder();
         builder3.add(new TopicPartition("foo", 0),
@@ -366,13 +369,13 @@ public class FetchSessionHandlerTest {
     @Test
     public void testVerifyFullFetchResponsePartitions() throws Exception {
         FetchSessionHandler handler = new FetchSessionHandler(LOG_CONTEXT, 1);
-        topicNames.put(Uuid.randomUuid(), "foo");
-        topicNames.put(Uuid.randomUuid(), "bar");
+        addTopicId("foo");
+        addTopicId("bar");
         String issue = handler.verifyFullFetchResponsePartitions(new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
+                Collections.emptyList(), topicIds, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertTrue(issue.contains("extra"));
         assertFalse(issue.contains("omitted"));
         FetchSessionHandler.Builder builder = handler.newBuilder();
@@ -387,13 +390,19 @@ public class FetchSessionHandlerTest {
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20),
                 new RespEntry("bar", 0, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
+                Collections.emptyList(), topicIds, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertTrue(issue2 == null);
         String issue3 = handler.verifyFullFetchResponsePartitions(new FetchResponse<>(Errors.NONE,
             respMap(new RespEntry("foo", 0, 10, 20),
                 new RespEntry("foo", 1, 10, 20)),
-            topicNames, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
+                Collections.emptyList(), topicIds, 0, INVALID_SESSION_ID).responseData(topicNames).keySet());
         assertFalse(issue3.contains("extra"));
         assertTrue(issue3.contains("omitted"));
+    }
+
+    private void addTopicId(String name) {
+        Uuid id = Uuid.randomUuid();
+        topicIds.put(name, id);
+        topicNames.put(id, name);
     }
 }
