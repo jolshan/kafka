@@ -136,6 +136,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
+import static org.apache.kafka.common.protocol.ApiKeys.FETCH;
 import static org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH;
 import static org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH_OFFSET;
 import static org.apache.kafka.common.requests.FetchMetadata.INVALID_SESSION_ID;
@@ -1285,8 +1286,8 @@ public class FetcherTest {
             FetchResponse.INVALID_LAST_STABLE_OFFSET, FetchResponse.INVALID_LOG_START_OFFSET, null, records));
         partitions.put(tp0, new FetchResponse.PartitionData<>(Errors.OFFSET_OUT_OF_RANGE, 100,
             FetchResponse.INVALID_LAST_STABLE_OFFSET, FetchResponse.INVALID_LOG_START_OFFSET, null, MemoryRecords.EMPTY));
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-            0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+            0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
 
         List<ConsumerRecord<byte[], byte[]>> allFetchedRecords = new ArrayList<>();
@@ -1335,8 +1336,8 @@ public class FetcherTest {
                 0L, null, nextRecords));
         partitions.put(tp3, new FetchResponse.PartitionData<>(Errors.NONE, 100L, 4,
                 0L, null, partialRecords));
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
 
         List<ConsumerRecord<byte[], byte[]>> fetchedRecords = new ArrayList<>();
@@ -1409,8 +1410,8 @@ public class FetcherTest {
         partitions = new HashMap<>();
         partitions.put(tp1, new FetchResponse.PartitionData<>(Errors.OFFSET_OUT_OF_RANGE, 100,
                 FetchResponse.INVALID_LAST_STABLE_OFFSET, FetchResponse.INVALID_LOG_START_OFFSET, Optional.empty(), null, MemoryRecords.EMPTY));
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
         assertEquals(1, fetcher.fetchedRecords().get(tp0).size());
 
@@ -2274,8 +2275,8 @@ public class FetcherTest {
         }
 
         assertEquals(1, fetcher.sendFetches());
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, fetchPartitionData, Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, fetchPartitionData, Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
 
         Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> fetchedRecords = fetchedRecords();
@@ -2341,8 +2342,8 @@ public class FetcherTest {
                 FetchResponse.INVALID_LAST_STABLE_OFFSET, 0L, null, MemoryRecords.EMPTY));
 
         assertEquals(1, fetcher.sendFetches());
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
         fetcher.fetchedRecords();
 
@@ -2383,8 +2384,8 @@ public class FetcherTest {
                 FetchResponse.INVALID_LAST_STABLE_OFFSET, 0L, null,
                 MemoryRecords.withRecords(CompressionType.NONE, new SimpleRecord("val".getBytes()))));
 
-        client.prepareResponse(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data()));
         consumerClient.poll(time.timer(0));
         fetcher.fetchedRecords();
 
@@ -3229,8 +3230,8 @@ public class FetcherTest {
                 2, 0L, null, this.records));
         partitions1.put(tp1, new FetchResponse.PartitionData<>(Errors.NONE, 100L,
                 FetchResponse.INVALID_LAST_STABLE_OFFSET, 0L, null, emptyRecords));
-        FetchResponse<MemoryRecords> resp1 = new FetchResponse<>(Errors.NONE, partitions1, Collections.emptyList(), topicIds,
-                0, 123);
+        FetchResponse<MemoryRecords> resp1 = new FetchResponse<>(new FetchResponse<>(Errors.NONE, partitions1, Collections.emptyList(), topicIds,
+                0, 123).data());
         client.prepareResponse(resp1);
         assertEquals(1, fetcher.sendFetches());
         assertFalse(fetcher.hasCompletedFetches());
@@ -3256,7 +3257,7 @@ public class FetcherTest {
 
         // The second response contains no new records.
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions2 = new LinkedHashMap<>();
-        FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(Errors.NONE, partitions2, Collections.emptyList(), topicIds, 0, 123);
+        FetchResponse<MemoryRecords> resp2 = new FetchResponse<>(new FetchResponse<>(Errors.NONE, partitions2, Collections.emptyList(), topicIds, 0, 123).data());
         client.prepareResponse(resp2);
         assertEquals(1, fetcher.sendFetches());
         consumerClient.poll(time.timer(0));
@@ -3269,7 +3270,7 @@ public class FetcherTest {
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions3 = new LinkedHashMap<>();
         partitions3.put(tp0, new FetchResponse.PartitionData<>(Errors.NONE, 100L,
                 4, 0L, null, this.nextRecords));
-        FetchResponse<MemoryRecords> resp3 = new FetchResponse<>(Errors.NONE, partitions3, Collections.emptyList(), topicIds, 0, 123);
+        FetchResponse<MemoryRecords> resp3 = new FetchResponse<>(new FetchResponse<>(Errors.NONE, partitions3, Collections.emptyList(), topicIds, 0, 123).data());
         client.prepareResponse(resp3);
         assertEquals(1, fetcher.sendFetches());
         consumerClient.poll(time.timer(0));
@@ -3328,9 +3329,9 @@ public class FetcherTest {
                         }
 
                         @Override
-                        public boolean handleResponse(FetchResponse<?> response, Map<Uuid, String> topicNames) {
+                        public boolean handleResponse(FetchResponse<?> response, short version) {
                             verifySessionPartitions();
-                            return handler.handleResponse(response, topicNames);
+                            return handler.handleResponse(response, version);
                         }
 
                         @Override
@@ -3383,8 +3384,8 @@ public class FetcherTest {
                             responseMap.put(tp, new FetchResponse.PartitionData<>(Errors.NONE, offset + 2L, offset + 2,
                                     0L, null, buildRecords(offset, 2, offset)));
                         }
-                        client.respondToRequest(request, new FetchResponse<>(Errors.NONE, responseMap, Collections.emptyList(), topicIds,
-                                0, 123));
+                        client.respondToRequest(request, new FetchResponse<>(new FetchResponse<>(Errors.NONE, responseMap, Collections.emptyList(), topicIds,
+                                0, 123).data()));
                         consumerClient.poll(time.timer(0));
                     }
                 }
@@ -3442,8 +3443,8 @@ public class FetcherTest {
                         responseMap.put(tp0, new FetchResponse.PartitionData<>(Errors.NONE, nextOffset + 2L, nextOffset + 2,
                                 0L, null, buildRecords(nextOffset, 2, nextOffset)));
                         nextOffset += 2;
-                        client.respondToRequest(request, new FetchResponse<>(Errors.NONE, responseMap, Collections.emptyList(), topicIds,
-                                0, 123));
+                        client.respondToRequest(request, new FetchResponse<>(new FetchResponse<>(Errors.NONE, responseMap, Collections.emptyList(), topicIds,
+                                0, 123).data()));
                         consumerClient.poll(time.timer(0));
                     }
                 }
@@ -4482,8 +4483,8 @@ public class FetcherTest {
                                                                                   int throttleTime) {
         Map<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions = Collections.singletonMap(tp0,
                 new FetchResponse.PartitionData<>(error, hw, lastStableOffset, 0L, abortedTransactions, records));
-        return new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                throttleTime, INVALID_SESSION_ID);
+        return new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                throttleTime, INVALID_SESSION_ID).data());
     }
 
     private FetchResponse<MemoryRecords> fullFetchResponse(TopicPartition tp, MemoryRecords records, Errors error, long hw, int throttleTime) {
@@ -4494,8 +4495,8 @@ public class FetcherTest {
                                             long lastStableOffset, int throttleTime) {
         Map<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions = Collections.singletonMap(tp,
                 new FetchResponse.PartitionData<>(error, hw, lastStableOffset, 0L, null, records));
-        return new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                throttleTime, INVALID_SESSION_ID);
+        return new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                throttleTime, INVALID_SESSION_ID).data());
     }
 
     private FetchResponse<MemoryRecords> fullFetchResponse(TopicPartition tp, MemoryRecords records, Errors error, long hw,
@@ -4503,8 +4504,8 @@ public class FetcherTest {
         Map<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions = Collections.singletonMap(tp,
                 new FetchResponse.PartitionData<>(error, hw, lastStableOffset, 0L,
                         preferredReplicaId, null, records));
-        return new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
-                throttleTime, INVALID_SESSION_ID);
+        return new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), Collections.emptyList(), topicIds,
+                throttleTime, INVALID_SESSION_ID).data());
     }
 
     private FetchResponse<MemoryRecords> fetchResponse(TopicPartition tp, MemoryRecords records, Errors error, long hw,

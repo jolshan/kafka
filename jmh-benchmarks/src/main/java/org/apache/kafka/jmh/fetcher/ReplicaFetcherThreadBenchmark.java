@@ -50,6 +50,7 @@ import org.apache.kafka.common.message.LeaderAndIsrRequestData;
 import org.apache.kafka.common.message.OffsetForLeaderEpochRequestData.OffsetForLeaderPartition;
 import org.apache.kafka.common.message.OffsetForLeaderEpochResponseData.EpochEndOffset;
 import org.apache.kafka.common.metrics.Metrics;
+import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.BaseRecords;
 import org.apache.kafka.common.record.Records;
@@ -194,7 +195,7 @@ public class ReplicaFetcherThreadBenchmark {
         // so that we do not measure this time as part of the steady state work
         fetcher.doWork();
         // handle response to engage the incremental fetch session handler
-        fetcher.fetchSessionHandler().handleResponse(new FetchResponse<>(Errors.NONE, initialFetched, idErrors, topicIds, 0, 999), topicNames);
+        fetcher.fetchSessionHandler().handleResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, initialFetched, idErrors, topicIds, 0, 999).data()), ApiKeys.FETCH.latestVersion());
     }
 
     @TearDown(Level.Trial)

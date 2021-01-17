@@ -20,6 +20,7 @@ package org.apache.kafka.jmh.fetchsession;
 import org.apache.kafka.clients.FetchSessionHandler;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.FetchRequest;
@@ -67,15 +68,16 @@ public class FetchSessionBenchmark {
 
     private LinkedHashMap<TopicPartition, FetchRequest.PartitionData> fetches;
     private FetchSessionHandler handler;
+    private Map<String, Uuid> topicIds;
 
     @Setup(Level.Trial)
     public void setUp() {
         fetches = new LinkedHashMap<>();
         handler = new FetchSessionHandler(LOG_CONTEXT, 1);
+        topicIds = new HashMap<>();
         FetchSessionHandler.Builder builder = handler.newBuilder();
 
         Map<Uuid, String> topicNames = new HashMap<>();
-        Map<String, Uuid> topicIds = new HashMap<>();
         List<FetchResponse.IdError> idErrors = new LinkedList<>();
         Uuid id = Uuid.randomUuid();
         topicNames.put(id, "foo");
@@ -87,7 +89,7 @@ public class FetchSessionBenchmark {
             FetchRequest.PartitionData partitionData = new FetchRequest.PartitionData(0, 0, 200,
                     Optional.empty());
             fetches.put(tp, partitionData);
-            builder.add(tp, partitionData);
+            builder.add(tp, topicIds.get(tp.topic()), partitionData);
             respMap.put(tp, new FetchResponse.PartitionData<>(
                     Errors.NONE,
                     0L,
@@ -98,7 +100,7 @@ public class FetchSessionBenchmark {
         }
         builder.build();
         // build and handle an initial response so that the next fetch will be incremental
-        handler.handleResponse(new FetchResponse<>(Errors.NONE, respMap, idErrors, topicIds, 0, 1), topicNames);
+        handler.handleResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, respMap, idErrors, topicIds, 0, 1).data()), ApiKeys.FETCH.latestVersion());
 
         int counter = 0;
         for (TopicPartition topicPartition: new ArrayList<>(fetches.keySet())) {
@@ -122,7 +124,7 @@ public class FetchSessionBenchmark {
             builder = handler.newBuilder();
 
         for (Map.Entry<TopicPartition, FetchRequest.PartitionData> entry: fetches.entrySet()) {
-            builder.add(entry.getKey(), entry.getValue());
+            builder.add(entry.getKey(), topicIds.get(entry.getKey().topic()), entry.getValue());
         }
 
         builder.build();

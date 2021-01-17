@@ -576,6 +576,7 @@ class ReplicaFetcherThreadTest {
       t1p0 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(4).setEndOffset(140)),
       t1p1 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(4).setEndOffset(141))
     ))
+    mockNetwork.setIdsForNextResponse(topicIds)
     latestLogEpoch = Some(4)
     thread.doWork()
     assertEquals(0, mockNetwork.epochFetchCount)
@@ -592,6 +593,7 @@ class ReplicaFetcherThreadTest {
       t1p0 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(3).setEndOffset(130)),
       t1p1 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(3).setEndOffset(131))
     ))
+    mockNetwork.setIdsForNextResponse(topicIds)
     thread.doWork()
     assertEquals(0, mockNetwork.epochFetchCount)
     assertEquals(3, mockNetwork.fetchCount)
@@ -606,6 +608,7 @@ class ReplicaFetcherThreadTest {
       t1p0 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(2).setEndOffset(120)),
       t1p1 -> partitionData(new FetchResponseData.EpochEndOffset().setEpoch(2).setEndOffset(121))
     ))
+    mockNetwork.setIdsForNextResponse(topicIds)
     latestLogEpoch = None
     thread.doWork()
     assertEquals(0, mockNetwork.epochFetchCount)

@@ -75,6 +75,10 @@ class ReplicaFetcherMockBlockingSend(offsets: java.util.Map[TopicPartition, Epoc
     fetchPartitionData = partitionData
   }
 
+  def setIdsForNextResponse(topicIds: Map[String, Uuid]): Unit = {
+    this.topicIds = topicIds
+  }
+
   override def sendRequest(requestBuilder: Builder[_ <: AbstractRequest]): ClientResponse = {
     if (!NetworkClientUtils.awaitReady(client, sourceNode, time, 500))
       throw new SocketTimeoutException(s"Failed to connect within 500 ms")
@@ -108,8 +112,8 @@ class ReplicaFetcherMockBlockingSend(offsets: java.util.Map[TopicPartition, Epoc
         val partitionData = new util.LinkedHashMap[TopicPartition, FetchResponse.PartitionData[Records]]
         fetchPartitionData.foreach { case (tp, data) => partitionData.put(tp, data) }
         fetchPartitionData = Map.empty
-        new FetchResponse(Errors.NONE, partitionData, Collections.emptyList(), topicIds.asJava, 0,
-          if (partitionData.isEmpty) JFetchMetadata.INVALID_SESSION_ID else 1)
+        new FetchResponse(new FetchResponse(Errors.NONE, partitionData, Collections.emptyList(), topicIds.asJava, 0,
+          if (partitionData.isEmpty) JFetchMetadata.INVALID_SESSION_ID else 1).data())
 
       case _ =>
         throw new UnsupportedOperationException

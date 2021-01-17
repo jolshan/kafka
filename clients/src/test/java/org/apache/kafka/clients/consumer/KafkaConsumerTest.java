@@ -2275,8 +2275,8 @@ public class KafkaConsumerTest {
                     Errors.NONE, 0, FetchResponse.INVALID_LAST_STABLE_OFFSET,
                     0L, null, records));
         }
-        return new FetchResponse<>(Errors.NONE, tpResponses, Collections.emptyList(), topicIds,
-                0, INVALID_SESSION_ID);
+        return new FetchResponse<>(new FetchResponse<>(Errors.NONE, tpResponses, Collections.emptyList(), topicIds,
+                0, INVALID_SESSION_ID).data());
     }
 
     private FetchResponse<MemoryRecords> fetchResponse(TopicPartition partition, long fetchOffset, int count) {

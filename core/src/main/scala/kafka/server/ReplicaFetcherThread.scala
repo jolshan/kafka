@@ -27,7 +27,7 @@ import kafka.server.AbstractFetcherThread.ReplicaFetch
 import kafka.server.AbstractFetcherThread.ResultWithPartitions
 import kafka.utils.Implicits._
 import org.apache.kafka.clients.FetchSessionHandler
-import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.{TopicPartition, Uuid}
 import org.apache.kafka.common.errors.KafkaStorageException
 import org.apache.kafka.common.message.ListOffsetsRequestData.{ListOffsetsPartition, ListOffsetsTopic}
 import org.apache.kafka.common.message.OffsetForLeaderEpochRequestData.OffsetForLeaderTopic
@@ -217,10 +217,10 @@ class ReplicaFetcherThread(name: String,
     try {
       val clientResponse = leaderEndpoint.sendRequest(fetchRequest)
       val fetchResponse = clientResponse.responseBody.asInstanceOf[FetchResponse[Records]]
-      val topicNames = replicaMgr.metadataCache.getTopicNames().asJava
-      if (!fetchSessionHandler.handleResponse(fetchResponse, topicNames)) {
+      if (!fetchSessionHandler.handleResponse(fetchResponse, fetchRequestVersion)) {
         Map.empty
       } else {
+        val topicNames = replicaMgr.metadataCache.getTopicNames().asJava
         fetchResponse.responseData(topicNames).asScala
       }
     } catch {
@@ -266,6 +266,7 @@ class ReplicaFetcherThread(name: String,
 
   override def buildFetch(partitionMap: Map[TopicPartition, PartitionFetchState]): ResultWithPartitions[Option[ReplicaFetch]] = {
     val partitionsWithError = mutable.Set[TopicPartition]()
+    val topicIds = replicaMgr.metadataCache.getTopicIds()
 
     val builder = fetchSessionHandler.newBuilder(partitionMap.size, false)
     partitionMap.forKeyValue { (topicPartition, fetchState) =>
@@ -277,7 +278,7 @@ class ReplicaFetcherThread(name: String,
             fetchState.lastFetchedEpoch.map(_.asInstanceOf[Integer]).asJava
           else
             Optional.empty[Integer]
-          builder.add(topicPartition, new FetchRequest.PartitionData(
+          builder.add(topicPartition, topicIds.getOrElse(topicPartition.topic(), Uuid.ZERO_UUID), new FetchRequest.PartitionData(
             fetchState.fetchOffset,
             logStartOffset,
             fetchSize,

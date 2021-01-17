@@ -3089,7 +3089,7 @@ class KafkaApisTest {
         topicIds.put(tp.topic(), id)
         topicNames.put(id, tp.topic())
       }
-      new FetchResponse(Errors.NONE, responseData, Collections.emptyList(), topicIds, 100, 100)
+      new FetchResponse(new FetchResponse(Errors.NONE, responseData, Collections.emptyList(), topicIds, 100, 100).data())
     }
 
     val throttledPartition = new TopicPartition("throttledData", 0)

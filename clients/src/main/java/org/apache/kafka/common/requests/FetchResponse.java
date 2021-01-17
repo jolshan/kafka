@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.kafka.common.requests.FetchMetadata.INVALID_SESSION_ID;
@@ -435,6 +436,10 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
     private Boolean supportsTopicIds() {
         return data.responses().stream().findFirst().filter(
             topic -> !topic.topicId().equals(Uuid.ZERO_UUID)).isPresent();
+    }
+
+    public Set<Uuid> topicIds() {
+        return data.responses().stream().map(resp -> resp.topicId()).collect(Collectors.toSet());
     }
 
     /**
