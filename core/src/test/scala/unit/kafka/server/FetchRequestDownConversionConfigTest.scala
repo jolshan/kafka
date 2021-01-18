@@ -23,7 +23,7 @@ import kafka.log.LogConfig
 import kafka.utils.TestUtils
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.protocol.Errors
+import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.record.MemoryRecords
 import org.apache.kafka.common.requests.{FetchRequest, FetchResponse}
 import org.apache.kafka.common.serialization.StringSerializer
@@ -94,7 +94,7 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
     val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet)
     val topicNames = topicIds.map(_.swap)
     topicPartitions.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
+    val fetchRequest = FetchRequest.Builder.forConsumer(1, Int.MaxValue, 0, createPartitionMap(1024,
       topicPartitions), topicIds.asJava).build(1)
     val fetchResponse = sendFetchRequest(topicMap.head._2, fetchRequest)
     topicPartitions.foreach(tp => assertEquals(Errors.UNSUPPORTED_VERSION, fetchResponse.responseData(topicNames.asJava).get(tp).error))
@@ -110,7 +110,7 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
     val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet)
     val topicNames = topicIds.map(_.swap)
     topicPartitions.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
+    val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, Int.MaxValue, 0, createPartitionMap(1024,
       topicPartitions), topicIds.asJava).build()
     val fetchResponse = sendFetchRequest(topicMap.head._2, fetchRequest)
     topicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(topicNames.asJava).get(tp).error))
@@ -137,7 +137,7 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
     val topicNames = topicIds.map(_.swap)
 
     allTopics.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
+    val fetchRequest = FetchRequest.Builder.forConsumer(1, Int.MaxValue, 0, createPartitionMap(1024,
       allTopics), topicIds.asJava).build(1)
     val fetchResponse = sendFetchRequest(leaderId, fetchRequest)
 

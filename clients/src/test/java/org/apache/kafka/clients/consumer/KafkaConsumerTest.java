@@ -1040,8 +1040,8 @@ public class KafkaConsumerTest {
         }
     }
 
-    /*
-    NEED TO FIGURE OUT WHAT TO DO WITH THIS TEST
+
+    //NEED TO FIGURE OUT WHAT TO DO WITH THIS TEST
     @Test
     public void fetchResponseWithUnexpectedPartitionIsIgnored() {
         Time time = new MockTime();
@@ -1070,7 +1070,7 @@ public class KafkaConsumerTest {
         assertEquals(0, records.count());
         consumer.close(Duration.ofMillis(0));
     }
-    */
+
 
     /**
      * Verify that when a consumer changes its topic subscription its assigned partitions

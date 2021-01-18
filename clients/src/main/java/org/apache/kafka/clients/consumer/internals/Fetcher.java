@@ -255,8 +255,14 @@ public class Fetcher<K, V> implements Closeable {
         for (Map.Entry<Node, FetchSessionHandler.FetchRequestData> entry : fetchRequestMap.entrySet()) {
             final Node fetchTarget = entry.getKey();
             final FetchSessionHandler.FetchRequestData data = entry.getValue();
+            final short maxVersion;
+            if (data.topicIds().size() == data.numTopic()) {
+                maxVersion = ApiKeys.FETCH.latestVersion();
+            } else {
+                maxVersion = (short) 12;
+            }
             final FetchRequest.Builder request = FetchRequest.Builder
-                    .forConsumer(this.maxWaitMs, this.minBytes, data.toSend(), metadata.topicIds())
+                    .forConsumer(maxVersion, this.maxWaitMs, this.minBytes, data.toSend(), metadata.topicIds())
                     .isolationLevel(isolationLevel)
                     .setMaxBytes(this.maxBytes)
                     .metadata(data.metadata())
@@ -285,7 +291,7 @@ public class Fetcher<K, V> implements Closeable {
                                         fetchTarget.id());
                                 return;
                             }
-                            if (!handler.handleResponse(response, ApiKeys.FETCH.latestVersion())) {
+                            if (!handler.handleResponse(response, maxVersion)) {
                                 return;
                             }
 

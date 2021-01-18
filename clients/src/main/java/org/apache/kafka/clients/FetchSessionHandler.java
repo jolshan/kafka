@@ -76,11 +76,24 @@ public class FetchSessionHandler {
     private LinkedHashMap<TopicPartition, PartitionData> sessionPartitions =
         new LinkedHashMap<>(0);
 
+    /**
+     * All of the topic ids mapped to topic names for topics which exist in the fetch request session.
+     */
     private Map<String, Uuid> sessionTopicIds = new HashMap<>(0);
 
+    /**
+     * All of the topic names mapped to topic ids for topics which exist in the fetch request session.
+     */
     private Map<Uuid, String> sessionTopicNames = new HashMap<>(0);
 
+    /**
+     * The number of partitions for all topics which exits in the fetch request session.
+     */
     private Map<String, Integer> sessionPartitionsPerTopic = new HashMap<>(0);
+
+    public Map<Uuid, String> getSessionTopicNames() {
+        return sessionTopicNames;
+    }
 
     public static class FetchRequestData {
         /**
@@ -252,8 +265,8 @@ public class FetchSessionHandler {
          * Mark that we want data from this partition in the upcoming fetch.
          */
         public void add(TopicPartition topicPartition, Uuid id, PartitionData data) {
-            next.put(topicPartition, data);
-            partitionsPerTopic.merge(topicPartition.topic(), 1, (prev, next) -> prev + next);
+            if (next.put(topicPartition, data) == null)
+                partitionsPerTopic.merge(topicPartition.topic(), 1, (prev, next) -> prev + next);
             if (!id.equals(Uuid.ZERO_UUID)) {
                 topicIds.put(topicPartition.topic(), id);
                 topicNames.put(id, topicPartition.topic());

@@ -58,7 +58,7 @@ class FetchRequestTest extends BaseRequestTest {
   private def createFetchRequest(maxResponseBytes: Int, maxPartitionBytes: Int, topicPartitions: Seq[TopicPartition],
                                  offsetMap: Map[TopicPartition, Long]): FetchRequest = {
     val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet).asJava
-    FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(maxPartitionBytes, topicPartitions, offsetMap), topicIds)
+    FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, Int.MaxValue, 0, createPartitionMap(maxPartitionBytes, topicPartitions, offsetMap), topicIds)
       .setMaxBytes(maxResponseBytes).build()
   }
 
@@ -172,7 +172,7 @@ class FetchRequestTest extends BaseRequestTest {
     val topicNames = topicIds.asScala.map(_.swap).asJava
     producer.send(new ProducerRecord(topicPartition.topic, topicPartition.partition,
       "key", new String(new Array[Byte](maxPartitionBytes + 1)))).get
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
+    val fetchRequest = FetchRequest.Builder.forConsumer(2, Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
       Seq(topicPartition)), topicIds).build(2)
     val fetchResponse = sendFetchRequest(leaderId, fetchRequest)
     val partitionData = fetchResponse.responseData(topicNames).get(topicPartition)
@@ -191,7 +191,7 @@ class FetchRequestTest extends BaseRequestTest {
     val topicNames = topicIds.asScala.map(_.swap).asJava
     producer.send(new ProducerRecord(topicPartition.topic, topicPartition.partition,
       "key", new String(new Array[Byte](maxPartitionBytes + 1)))).get
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
+    val fetchRequest = FetchRequest.Builder.forConsumer(4, Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
       Seq(topicPartition)), topicIds).isolationLevel(IsolationLevel.READ_COMMITTED).build(4)
     val fetchResponse = sendFetchRequest(leaderId, fetchRequest)
     val partitionData = fetchResponse.responseData(topicNames).get(topicPartition)
@@ -216,7 +216,7 @@ class FetchRequestTest extends BaseRequestTest {
     val nonReplicaId =  nonReplicaOpt.get.config.brokerId
 
     // Send the fetch request to the non-replica and verify the error code
-    val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(1024,
+    val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, Int.MaxValue, 0, createPartitionMap(1024,
       Seq(topicPartition)), topicIds).build()
     val fetchResponse = sendFetchRequest(nonReplicaId, fetchRequest)
     val partitionData = fetchResponse.responseData(topicNames).get(topicPartition)
@@ -251,7 +251,7 @@ class FetchRequestTest extends BaseRequestTest {
     val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
     partitionMap.put(topicPartition, new FetchRequest.PartitionData(fetchOffset, 0L, 1024,
       Optional.of(secondLeaderEpoch), Optional.of(firstLeaderEpoch)))
-    val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap, topicIds).build()
+    val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 0, 1, partitionMap, topicIds).build()
 
     // Validate the expected truncation
     val fetchResponse = sendFetchRequest(secondLeaderId, fetchRequest)
@@ -277,7 +277,7 @@ class FetchRequestTest extends BaseRequestTest {
     def assertResponseErrorForEpoch(error: Errors, brokerId: Int, leaderEpoch: Optional[Integer]): Unit = {
       val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
       partitionMap.put(topicPartition, new FetchRequest.PartitionData(0L, 0L, 1024, leaderEpoch))
-      val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap, topicIds).build()
+      val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 0, 1, partitionMap, topicIds).build()
       val fetchResponse = sendFetchRequest(brokerId, fetchRequest)
       val partitionData = fetchResponse.responseData(topicNames).get(topicPartition)
       assertEquals(error, partitionData.error)
@@ -330,7 +330,7 @@ class FetchRequestTest extends BaseRequestTest {
       Optional.of(leaderEpoch)))
     val topicIds = zkClient.getTopicIdsForTopics(Set(topicPartition.topic())).asJava
     val topicNames = topicIds.asScala.map(_.swap).asJava
-    val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap, topicIds)
+    val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 0, 1, partitionMap, topicIds)
       .metadata(JFetchMetadata.INITIAL)
       .build()
     val fetchResponse = sendFetchRequest(destinationBrokerId, fetchRequest)
@@ -341,7 +341,7 @@ class FetchRequestTest extends BaseRequestTest {
                                     leaderEpoch: Optional[Integer]): Unit = {
       val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
       partitionMap.put(topicPartition, new FetchRequest.PartitionData(0L, 0L, 1024, leaderEpoch))
-      val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap, topicIds)
+      val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 0, 1, partitionMap, topicIds)
         .metadata(new JFetchMetadata(sessionId, sessionFetchEpoch))
         .build()
       val fetchResponse = sendFetchRequest(destinationBrokerId, fetchRequest)
@@ -386,7 +386,7 @@ class FetchRequestTest extends BaseRequestTest {
     futures.foreach(_.get)
 
     def fetch(version: Short, maxPartitionBytes: Int, closeAfterPartialResponse: Boolean): Option[FetchResponse[MemoryRecords]] = {
-      val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
+      val fetchRequest = FetchRequest.Builder.forConsumer(version, Int.MaxValue, 0, createPartitionMap(maxPartitionBytes,
         Seq(topicPartition)), topicIds).build(version)
 
       val socket = connect(brokerSocketServer(leaderId))
@@ -457,7 +457,7 @@ class FetchRequestTest extends BaseRequestTest {
       // With KIP-283, we might not receive all batches in a single fetch request so loop through till we have consumed
       // all batches we are interested in.
       while (batchesReceived < expectedNumBatches) {
-        val fetchRequest = FetchRequest.Builder.forConsumer(Int.MaxValue, 0, createPartitionMap(Int.MaxValue,
+        val fetchRequest = FetchRequest.Builder.forConsumer(requestVersion, Int.MaxValue, 0, createPartitionMap(Int.MaxValue,
           Seq(topicPartition), Map(topicPartition -> currentFetchOffset)), topicIds).build(requestVersion)
         val fetchResponse = sendFetchRequest(leaderId, fetchRequest)
 
@@ -506,8 +506,7 @@ class FetchRequestTest extends BaseRequestTest {
    * Test that when an incremental fetch session contains partitions with an error,
    * those partitions are returned in all incremental fetch requests.
    *
-   * NEED TO UPDATE THIS TEST, perhaps change to invalid topic ID?
-   *
+   * NEED TO UPDATE THIS TEST, perhaps change to invalid topic ID? Fetch session can't keep track if invalid.
   @Test
   def testCreateIncrementalFetchWithPartitionsInError(): Unit = {
     def createFetchRequest(topicPartitions: Seq[TopicPartition],

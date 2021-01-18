@@ -861,7 +861,7 @@ public class RequestResponseTest {
         fetchData.put(new TopicPartition("test", 0), new FetchRequest.PartitionData(100, 2, 100, Optional.of(42)));
         Map<String, Uuid> topicIds = Collections.singletonMap("test1", Uuid.randomUuid());
         FetchRequest req = FetchRequest.Builder
-                .forConsumer(100, 100, fetchData, topicIds)
+                .forConsumer(ApiKeys.FETCH.latestVersion(), 100, 100, fetchData, topicIds)
                 .metadata(new FetchMetadata(10, 20))
                 .isolationLevel(IsolationLevel.READ_COMMITTED)
                 .build((short) 2);
@@ -1039,7 +1039,7 @@ public class RequestResponseTest {
         Map<String, Uuid> topicIds = new HashMap<>();
         topicIds.put("test1", Uuid.randomUuid());
         topicIds.put("test2", Uuid.randomUuid());
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).
+        return FetchRequest.Builder.forConsumer((short) version,100, 100000, fetchData, topicIds).
             metadata(metadata).setMaxBytes(1000).toForget(toForget).build((short) version);
     }
 
@@ -1052,7 +1052,7 @@ public class RequestResponseTest {
         Map<String, Uuid> topicIds = new HashMap<>();
         topicIds.put("test1", Uuid.randomUuid());
         topicIds.put("test2", Uuid.randomUuid());
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).
+        return FetchRequest.Builder.forConsumer((short) version,100, 100000, fetchData, topicIds).
             isolationLevel(isolationLevel).setMaxBytes(1000).build((short) version);
     }
 
@@ -1065,7 +1065,7 @@ public class RequestResponseTest {
         Map<String, Uuid> topicIds = new HashMap<>();
         topicIds.put("test1", Uuid.randomUuid());
         topicIds.put("test2", Uuid.randomUuid());
-        return FetchRequest.Builder.forConsumer(100, 100000, fetchData, topicIds).setMaxBytes(1000).build((short) version);
+        return FetchRequest.Builder.forConsumer((short) version,100, 100000, fetchData, topicIds).setMaxBytes(1000).build((short) version);
     }
 
     private FetchResponse<MemoryRecords> createFetchResponse(Errors error, int sessionId) {

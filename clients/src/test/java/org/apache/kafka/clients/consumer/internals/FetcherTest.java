@@ -136,7 +136,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.apache.kafka.common.protocol.ApiKeys.FETCH;
 import static org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH;
 import static org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH_OFFSET;
 import static org.apache.kafka.common.requests.FetchMetadata.INVALID_SESSION_ID;
@@ -2088,7 +2087,7 @@ public class FetcherTest {
 
         for (int i = 1; i <= 3; i++) {
             int throttleTimeMs = 100 * i;
-            FetchRequest.Builder builder = FetchRequest.Builder.forConsumer(100, 100, new LinkedHashMap<>(), topicIds);
+            FetchRequest.Builder builder = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion(), 100, 100, new LinkedHashMap<>(), topicIds);
             builder.rackId("");
             ClientRequest request = client.newClientRequest(node.idString(), builder, time.milliseconds(), true);
             client.send(request, time.milliseconds());

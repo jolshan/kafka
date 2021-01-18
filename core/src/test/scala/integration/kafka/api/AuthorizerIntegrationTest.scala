@@ -314,7 +314,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
   private def createFetchRequest = {
     val partitionMap = new util.LinkedHashMap[TopicPartition, requests.FetchRequest.PartitionData]
     partitionMap.put(tp, new requests.FetchRequest.PartitionData(0, 0, 100, Optional.of(27)))
-    requests.FetchRequest.Builder.forConsumer(100, Int.MaxValue, partitionMap, servers.head.kafkaController.controllerContext.topicIds.asJava).build()
+    requests.FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 100, Int.MaxValue, partitionMap, servers.head.kafkaController.controllerContext.topicIds.asJava).build()
   }
 
   //private def createFetchRequestWithUnknownTopic = {

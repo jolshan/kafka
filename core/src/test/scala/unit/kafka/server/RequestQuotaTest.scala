@@ -228,7 +228,7 @@ class RequestQuotaTest extends BaseRequestTest {
         case ApiKeys.FETCH =>
           val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
           partitionMap.put(tp, new FetchRequest.PartitionData(0, 0, 100, Optional.of(15)))
-          FetchRequest.Builder.forConsumer(0, 0, partitionMap, servers.head.kafkaController.controllerContext.topicIds.asJava)
+          FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, 0, 0, partitionMap, servers.head.kafkaController.controllerContext.topicIds.asJava)
 
         case ApiKeys.METADATA =>
           new MetadataRequest.Builder(List(topic).asJava, true)

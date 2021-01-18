@@ -190,9 +190,9 @@ public class FetchRequest extends AbstractRequest {
         private List<TopicPartition> toForget = Collections.emptyList();
         private String rackId = "";
 
-        public static Builder forConsumer(int maxWait, int minBytes, Map<TopicPartition, PartitionData> fetchData,
+        public static Builder forConsumer(short maxVersion, int maxWait, int minBytes, Map<TopicPartition, PartitionData> fetchData,
                                           Map<String, Uuid> topicIds) {
-            return new Builder(ApiKeys.FETCH.oldestVersion(), ApiKeys.FETCH.latestVersion(),
+            return new Builder(ApiKeys.FETCH.oldestVersion(), maxVersion,
                 CONSUMER_REPLICA_ID, maxWait, minBytes, fetchData, topicIds);
         }
 
