@@ -117,6 +117,22 @@ class FetchRequestDownConversionConfigTest extends BaseRequestTest {
   }
 
   /**
+   * Tests that "message.downconversion.enable" has no effect when down-conversion is not required on last version before topic IDs.
+   */
+  @Test
+  def testV12WithDownConversionDisabled(): Unit = {
+    val topicMap = createTopics(numTopics = 5, numPartitions = 1)
+    val topicPartitions = topicMap.keySet.toSeq
+    val topicIds = zkClient.getTopicIdsForTopics(topicPartitions.map(_.topic()).toSet)
+    val topicNames = topicIds.map(_.swap)
+    topicPartitions.foreach(tp => producer.send(new ProducerRecord(tp.topic(), "key", "value")).get())
+    val fetchRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion, Int.MaxValue, 0, createPartitionMap(1024,
+      topicPartitions), topicIds.asJava).build(12)
+    val fetchResponse = sendFetchRequest(topicMap.head._2, fetchRequest)
+    topicPartitions.foreach(tp => assertEquals(Errors.NONE, fetchResponse.responseData(topicNames.asJava).get(tp).error))
+  }
+
+  /**
    * Tests that "message.downconversion.enable" can be set at topic level, and its configuration is obeyed for client
    * fetch requests.
    */

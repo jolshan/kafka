@@ -64,7 +64,7 @@ public class FetchRequestBenchmark {
 
     Map<String, Uuid> topicIds;
 
-    Map<Uuid,String> topicNames;
+    Map<Uuid, String> topicNames;
 
     RequestHeader header;
 
@@ -92,7 +92,7 @@ public class FetchRequestBenchmark {
         }
 
         this.header = new RequestHeader(ApiKeys.FETCH, ApiKeys.FETCH.latestVersion(), "jmh-benchmark", 100);
-        this.consumerRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion(),0, 0, fetchData, topicIds)
+        this.consumerRequest = FetchRequest.Builder.forConsumer(ApiKeys.FETCH.latestVersion(), 0, 0, fetchData, topicIds)
             .build(ApiKeys.FETCH.latestVersion());
         this.replicaRequest = FetchRequest.Builder.forReplica(ApiKeys.FETCH.latestVersion(), 1, 0, 0, fetchData, topicIds)
             .build(ApiKeys.FETCH.latestVersion());

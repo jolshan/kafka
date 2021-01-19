@@ -54,10 +54,11 @@ import scala.compat.java8.OptionConverters._
 class AbstractFetcherThreadTest {
 
   val truncateOnFetch = true
+  val topicIds = Map("topic1" -> Uuid.randomUuid(), "topic2" -> Uuid.randomUuid()).asJava
+  val version = ApiKeys.FETCH.latestVersion()
   private val partition1 = new TopicPartition("topic1", 0)
   private val partition2 = new TopicPartition("topic2", 0)
   private val failedPartitions = new FailedPartitions
-  private val topicIds = Map("topic1" -> Uuid.randomUuid(), "topic2" -> Uuid.randomUuid()).asJava
 
   @Before
   def cleanMetricRegistry(): Unit = {
@@ -995,7 +996,7 @@ class AbstractFetcherThreadTest {
             1024 * 1024, Optional.of[Integer](state.currentLeaderEpoch), lastFetchedEpoch))
         }
       }
-      val fetchRequest = FetchRequest.Builder.forReplica(ApiKeys.FETCH.latestVersion, replicaId, 0, 1, fetchData.asJava, topicIds)
+      val fetchRequest = FetchRequest.Builder.forReplica(version, replicaId, 0, 1, fetchData.asJava, topicIds)
       ResultWithPartitions(Some(ReplicaFetch(fetchData.asJava, fetchRequest)), Set.empty)
     }
 

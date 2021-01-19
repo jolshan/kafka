@@ -215,6 +215,16 @@ public class FetcherTest {
             tp -> validLeaderEpoch, topicIds), false, 0L);
     }
 
+    private void assignFromUserNoId(Set<TopicPartition> partitions) {
+        subscriptions.assignFromUser(partitions);
+        client.updateMetadata(RequestTestUtils.metadataUpdateWith(1, singletonMap("noId", 1), Collections.emptyMap()));
+
+        // A dummy metadata update to ensure valid leader epoch.
+        metadata.update(9, RequestTestUtils.metadataUpdateWith("dummy", 1,
+            Collections.emptyMap(), singletonMap("noId", 1),
+            tp -> validLeaderEpoch, Collections.emptyMap()), false, 0L);
+    }
+
     @After
     public void teardown() throws Exception {
         if (metrics != null)
@@ -248,6 +258,36 @@ public class FetcherTest {
         List<ConsumerRecord<byte[], byte[]>> records = partitionRecords.get(tp0);
         assertEquals(3, records.size());
         assertEquals(4L, subscriptions.position(tp0).offset); // this is the next fetching position
+        long offset = 1;
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            assertEquals(offset, record.offset());
+            offset += 1;
+        }
+    }
+
+    @Test
+    public void testFetchWithNoId() {
+        // Should work and default to using old request type.
+        buildFetcher();
+
+        TopicPartition noId = new TopicPartition("noId", 0);
+        assignFromUserNoId(singleton(noId));
+        subscriptions.seek(noId, 0);
+
+        // normal fetch
+        assertEquals(1, fetcher.sendFetches());
+        assertFalse(fetcher.hasCompletedFetches());
+
+        client.prepareResponse(fullFetchResponse(noId, this.records, Errors.NONE, 100L, 0));
+        consumerClient.poll(time.timer(0));
+        assertTrue(fetcher.hasCompletedFetches());
+
+        Map<TopicPartition, List<ConsumerRecord<byte[], byte[]>>> partitionRecords = fetchedRecords();
+        assertTrue(partitionRecords.containsKey(noId));
+
+        List<ConsumerRecord<byte[], byte[]>> records = partitionRecords.get(noId);
+        assertEquals(3, records.size());
+        assertEquals(4L, subscriptions.position(noId).offset); // this is the next fetching position
         long offset = 1;
         for (ConsumerRecord<byte[], byte[]> record : records) {
             assertEquals(offset, record.offset());
@@ -1142,6 +1182,8 @@ public class FetcherTest {
         assertEquals(0L, metadata.timeToNextUpdate(time.milliseconds()));
     }
 
+    //public void testFetchUnknownTopicId() {
+
     @Test
     public void testFetchFencedLeaderEpoch() {
         buildFetcher();
@@ -1301,6 +1343,34 @@ public class FetcherTest {
 
         assertEquals(singleton(tp0), e.offsetOutOfRangePartitions().keySet());
         assertEquals(1L, e.offsetOutOfRangePartitions().get(tp0).longValue());
+
+        assertEquals(1, subscriptions.position(tp0).offset);
+        assertEquals(4, subscriptions.position(tp1).offset);
+        assertEquals(3, allFetchedRecords.size());
+    }
+
+    @Test
+    public void testFetchHandlesTopicIdException() {
+        // Verify topicIdError behaves as expected.
+        buildFetcher(OffsetResetStrategy.NONE, new ByteArrayDeserializer(),
+                new ByteArrayDeserializer(), Integer.MAX_VALUE, IsolationLevel.READ_UNCOMMITTED);
+        assignFromUser(Utils.mkSet(tp0, tp1));
+        subscriptions.seek(tp0, 1);
+        subscriptions.seek(tp1, 1);
+
+        assertEquals(1, fetcher.sendFetches());
+
+        Map<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> partitions = new LinkedHashMap<>();
+        partitions.put(tp1, new FetchResponse.PartitionData<>(Errors.NONE, 100,
+                FetchResponse.INVALID_LAST_STABLE_OFFSET, FetchResponse.INVALID_LOG_START_OFFSET, null, records));
+        List<FetchResponse.IdError> idErrors = Collections.singletonList(
+                new FetchResponse.IdError(topicIds.get(tp0.topic()), Collections.singletonList(0), Errors.UNKNOWN_TOPIC_OR_PARTITION));
+        client.prepareResponse(new FetchResponse<>(new FetchResponse<>(Errors.NONE, new LinkedHashMap<>(partitions), idErrors, topicIds,
+                0, INVALID_SESSION_ID).data()));
+        consumerClient.poll(time.timer(0));
+
+        List<ConsumerRecord<byte[], byte[]>> allFetchedRecords = new ArrayList<>();
+        fetchRecordsInto(allFetchedRecords);
 
         assertEquals(1, subscriptions.position(tp0).offset);
         assertEquals(4, subscriptions.position(tp1).offset);

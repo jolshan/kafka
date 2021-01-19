@@ -439,7 +439,7 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
     }
 
     public Set<Uuid> topicIds() {
-        return data.responses().stream().map(resp -> resp.topicId()).collect(Collectors.toSet());
+        return data.responses().stream().map(resp -> resp.topicId()).filter(id -> !id.equals(Uuid.ZERO_UUID)).collect(Collectors.toSet());
     }
 
     /**

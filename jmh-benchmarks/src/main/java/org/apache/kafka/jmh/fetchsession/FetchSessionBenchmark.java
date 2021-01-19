@@ -77,10 +77,8 @@ public class FetchSessionBenchmark {
         topicIds = new HashMap<>();
         FetchSessionHandler.Builder builder = handler.newBuilder();
 
-        Map<Uuid, String> topicNames = new HashMap<>();
         List<FetchResponse.IdError> idErrors = new LinkedList<>();
         Uuid id = Uuid.randomUuid();
-        topicNames.put(id, "foo");
         topicIds.put("foo", id);
 
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<MemoryRecords>> respMap = new LinkedHashMap<>();

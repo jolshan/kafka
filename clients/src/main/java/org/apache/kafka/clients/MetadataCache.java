@@ -168,8 +168,10 @@ public class MetadataCache {
         for (Map.Entry<String, Uuid> entry : topicIds.entrySet()) {
             newTopicIds.put(entry.getKey(), entry.getValue());
         }
+        // If topicIds.get is null, this metadata response did not support topic IDs and we should not store ID.
+        // This is so we can revert back to older fetch requests that do not use topic ID.
         for (Map.Entry<String, Uuid> entry : this.topicIds.entrySet()) {
-            if (shouldRetainTopic.test(entry.getKey())) {
+            if (shouldRetainTopic.test(entry.getKey()) && topicIds.get(entry.getKey()) != null) {
                 newTopicIds.put(entry.getKey(), entry.getValue());
             }
         }

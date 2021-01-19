@@ -43,7 +43,14 @@ import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -63,7 +70,7 @@ public class FetchResponseBenchmark {
 
     Map<String, Uuid> topicIds;
 
-    LinkedHashMap<Uuid,String> topicNames;
+    Map<Uuid, String> topicNames;
 
     List<FetchResponse.IdError> idErrors;
 
@@ -80,7 +87,7 @@ public class FetchResponseBenchmark {
 
         this.responseData = new LinkedHashMap<>();
         this.topicIds = new HashMap<>();
-        this.topicNames = new LinkedHashMap<>();
+        this.topicNames = new HashMap<>();
         this.idErrors = new LinkedList<>();
         for (int topicIdx = 0; topicIdx < topicCount; topicIdx++) {
             String topic = UUID.randomUUID().toString();

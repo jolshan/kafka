@@ -27,7 +27,6 @@ import kafka.log.Defaults;
 import kafka.log.LogAppendInfo;
 import kafka.log.LogConfig;
 import kafka.log.LogManager;
-import kafka.server.AbstractFetcherThread;
 import kafka.server.AlterIsrManager;
 import kafka.server.BrokerState;
 import kafka.server.BrokerTopicStats;
@@ -142,7 +141,6 @@ public class ReplicaFetcherThreadBenchmark {
                 Time.SYSTEM);
 
         LinkedHashMap<TopicPartition, FetchResponse.PartitionData<BaseRecords>> initialFetched = new LinkedHashMap<>();
-        HashMap<Uuid, String> topicNames = new HashMap<>();
         HashMap<String, Uuid> topicIds = new HashMap<>();
         List<FetchResponse.IdError> idErrors = new LinkedList<>();
         scala.collection.mutable.Map<TopicPartition, InitialFetchState> initialFetchStates = new scala.collection.mutable.HashMap<>();
@@ -184,7 +182,6 @@ public class ReplicaFetcherThreadBenchmark {
             initialFetched.put(tp, new FetchResponse.PartitionData<>(Errors.NONE, 0, 0, 0,
                     new LinkedList<>(), fetched));
             topicIds.putIfAbsent(tp.topic(), Uuid.randomUuid());
-            topicNames.putIfAbsent(topicIds.get(tp.topic()), tp.topic());
         }
 
         ReplicaManager replicaManager = Mockito.mock(ReplicaManager.class);
