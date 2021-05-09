@@ -400,8 +400,8 @@ public class FetchSessionHandlerTest {
                         new RespEntry("bar", 0, 10, 20)), topicIds);
             String issue = handler.verifyFullFetchResponsePartitions(resp1.responseData(topicNames, version).keySet(),
                     resp1.topicIds(), version);
-            assertTrue(issue.contains("extra"));
-            assertFalse(issue.contains("omitted"));
+            assertTrue(issue.contains("extraPartitions="));
+            assertFalse(issue.contains("omittedPartitions="));
             FetchSessionHandler.Builder builder = handler.newBuilder();
             builder.add(new TopicPartition("foo", 0), topicIds.getOrDefault("foo", Uuid.ZERO_UUID),
                     new FetchRequest.PartitionData(0, 100, 200, Optional.empty()));
@@ -422,8 +422,8 @@ public class FetchSessionHandlerTest {
                         new RespEntry("foo", 1, 10, 20)), topicIds);
             String issue3 = handler.verifyFullFetchResponsePartitions(resp3.responseData(topicNames, version).keySet(),
                     resp3.topicIds(), version);
-            assertFalse(issue3.contains("extra"));
-            assertTrue(issue3.contains("omitted"));
+            assertFalse(issue3.contains("extraPartitions="));
+            assertTrue(issue3.contains("omittedPartitions="));
         });
     }
 
@@ -442,9 +442,9 @@ public class FetchSessionHandlerTest {
                     new RespEntry("bar", 0, 10, 20)), topicIds);
         String issue = handler.verifyFullFetchResponsePartitions(resp1.responseData(topicNames, ApiKeys.FETCH.latestVersion()).keySet(),
                 resp1.topicIds(), ApiKeys.FETCH.latestVersion());
-        assertTrue(issue.contains("extra="));
+        assertTrue(issue.contains("extraPartitions="));
         assertTrue(issue.contains("extraIds="));
-        assertFalse(issue.contains("omitted"));
+        assertFalse(issue.contains("omittedPartitions="));
         FetchSessionHandler.Builder builder = handler.newBuilder();
         builder.add(new TopicPartition("foo", 0), topicIds.get("foo"),
                 new FetchRequest.PartitionData(0, 100, 200, Optional.empty()));
@@ -457,9 +457,9 @@ public class FetchSessionHandlerTest {
                     new RespEntry("bar", 0, 10, 20)), topicIds);
         String issue2 = handler.verifyFullFetchResponsePartitions(resp2.responseData(topicNames, ApiKeys.FETCH.latestVersion()).keySet(),
                 resp2.topicIds(), ApiKeys.FETCH.latestVersion());
-        assertFalse(issue2.contains("extra="));
+        assertFalse(issue2.contains("extraPartitions="));
         assertTrue(issue2.contains("extraIds="));
-        assertFalse(issue2.contains("omitted"));
+        assertFalse(issue2.contains("omittedPartitions="));
         topicNames.put(extraId, "extra2");
         FetchResponse resp3 = FetchResponse.of(Errors.NONE, 0, INVALID_SESSION_ID,
             respMap(new RespEntry("foo", 0, 10, 20),

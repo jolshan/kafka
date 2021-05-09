@@ -32,6 +32,7 @@ import org.junit.jupiter.api.{Test, Timeout}
 import scala.jdk.CollectionConverters._
 import java.util
 import java.util.{Collections, Optional}
+
 import scala.collection.mutable.ArrayBuffer
 
 @Timeout(120)
@@ -56,12 +57,14 @@ class FetchSessionTest {
     assertEquals(sessionIds.size, cache.size)
   }
 
-  private def dummyCreate(size: Int): FetchSession.CACHE_MAP = {
+  private def dummyCreate(size: Int): (FetchSession.CACHE_MAP, FetchSession.TOPIC_ID_MAP) = {
     val cacheMap = new FetchSession.CACHE_MAP(size)
+    val topicIds = new util.HashMap[String, Uuid]()
     for (i <- 0 until size) {
       cacheMap.add(new CachedPartition("test", i))
     }
-    cacheMap
+    topicIds.put("topic", Uuid.randomUuid())
+    (cacheMap, topicIds)
   }
 
   @Test
@@ -712,29 +715,21 @@ class FetchSessionTest {
       topicIdsFooChanged
     )
     assertEquals(classOf[IncrementalFetchContext], context2.getClass)
-    var parts2 = Set(new TopicPartition("bar", 1), new TopicPartition("foo", 0))
-    var reqData2Iter = parts2.iterator
-    // Before sending the response, foo is still in partitionMap
-    context2.foreachPartition((topicPart, _) => {
-      assertEquals(reqData2Iter.next(), topicPart)
-    })
     val respData2 = new util.LinkedHashMap[TopicPartition, FetchResponseData.PartitionData]
     respData2.put(new TopicPartition("foo", 0), new FetchResponseData.PartitionData()
       .setPartitionIndex(0)
-      .setHighWatermark(100)
-      .setLastStableOffset(100)
-      .setLogStartOffset(100))
+      .setHighWatermark(-1)
+      .setLastStableOffset(-1)
+      .setLogStartOffset(-1)
+      .setErrorCode(Errors.UNKNOWN_TOPIC_OR_PARTITION.code))
     val resp2 = context2.updateAndGenerateResponseData(respData2)
-    // foo should now be removed since the ID changed.
-    parts2 = Set(new TopicPartition("bar", 1))
-    reqData2Iter = parts2.iterator
-    context2.foreachPartition((topicPart, _) => {
-      assertEquals(reqData2Iter.next(), topicPart)
-    })
 
     assertEquals(Errors.NONE, resp2.error)
     assertTrue(resp2.sessionId > 0)
-    assertEquals(0, resp2.responseData(topicNames, request2.version).size)
+    val responseData2 = resp2.responseData(topicNames, request2.version)
+    assertEquals(1, responseData2.size())
+    // We should get UNKNOWN_TOPIC_ID error since the topic ID on the partition did not match the ID on the broker.
+    assertEquals(Errors.UNKNOWN_TOPIC_ID.code(), responseData2.get(new TopicPartition("foo", 0)).errorCode())
   }
 
   @Test

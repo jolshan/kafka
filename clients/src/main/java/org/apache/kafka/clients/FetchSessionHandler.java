@@ -91,7 +91,7 @@ public class FetchSessionHandler {
         return sessionTopicNames;
     }
 
-    public boolean requestUsedTopicIds = false;
+    private boolean requestUsedTopicIds = false;
 
     public static class FetchRequestData {
         /**
@@ -186,12 +186,26 @@ public class FetchSessionHandler {
         @Override
         public String toString() {
             if (metadata.isFull()) {
-                StringBuilder bld = new StringBuilder("FullFetchRequest(");
+                StringBuilder bld = new StringBuilder("FullFetchRequest(toSend=(");
                 String prefix = "";
                 for (TopicPartition partition : toSend.keySet()) {
                     bld.append(prefix);
                     bld.append(partition);
                     prefix = ", ";
+                }
+                bld.append("), topicIds=(");
+                prefix = "";
+                for (Map.Entry<String, Uuid> entry : topicIds.entrySet()) {
+                    bld.append(prefix);
+                    bld.append(entry.getKey());
+                    bld.append(": ");
+                    bld.append(entry.getValue());
+                    prefix = ", ";
+                }
+                if (canUseTopicIds) {
+                    bld.append("), canUseTopicIds=True");
+                } else {
+                    bld.append("), canUseTopicIds=False");
                 }
                 bld.append(")");
                 return bld.toString();
@@ -219,7 +233,21 @@ public class FetchSessionHandler {
                         prefix = ", ";
                     }
                 }
-                bld.append("))");
+                bld.append("), topicIds=(");
+                prefix = "";
+                for (Map.Entry<String, Uuid> entry : topicIds.entrySet()) {
+                    bld.append(prefix);
+                    bld.append(entry.getKey());
+                    bld.append(": ");
+                    bld.append(entry.getValue());
+                    prefix = ", ";
+                }
+                if (canUseTopicIds) {
+                    bld.append("), canUseTopicIds=True");
+                } else {
+                    bld.append("), canUseTopicIds=False");
+                }
+                bld.append(")");
                 return bld.toString();
             }
         }
@@ -378,11 +406,11 @@ public class FetchSessionHandler {
     }
 
     /**
-     * Return some partitions which are expected to be in a particular set, but which are not.
+     * Return missing items which are expected to be in a particular set, but which are not.
      *
      * @param toFind    The items to look for.
      * @param toSearch  The set of items to search.
-     * @return          null if all items were found; some of the missing ones in a set, if not
+     * @return          null if all items were found; some of the missing ones in a set, if not.
      */
     static <T> Set<T> findMissing(Set<T> toFind, Set<T> toSearch) {
         Set<T> ret = new LinkedHashSet<>();
@@ -413,10 +441,10 @@ public class FetchSessionHandler {
             extraIds = findMissing(ids, sessionTopicNames.keySet());
         }
         if (!omitted.isEmpty()) {
-            bld.append("omitted=(").append(Utils.join(omitted, ", ")).append(", ");
+            bld.append("omittedPartitions=(").append(Utils.join(omitted, ", ")).append(", ");
         }
         if (!extra.isEmpty()) {
-            bld.append("extra=(").append(Utils.join(extra, ", ")).append(", ");
+            bld.append("extraPartitions=(").append(Utils.join(extra, ", ")).append(", ");
         }
         if (!extraIds.isEmpty()) {
             bld.append("extraIds=(").append(Utils.join(extraIds, ", ")).append(", ");
@@ -445,7 +473,7 @@ public class FetchSessionHandler {
             findMissing(topicPartitions, sessionPartitions.keySet());
         StringBuilder bld = new StringBuilder();
         if (extra.isEmpty())
-            bld.append("extra=(").append(Utils.join(extra, ", ")).append("), ");
+            bld.append("extraPartitions=(").append(Utils.join(extra, ", ")).append("), ");
         if (extraIds.isEmpty())
             bld.append("extraIds=(").append(Utils.join(extraIds, ", ")).append("), ");
         if ((!extra.isEmpty()) || (!extraIds.isEmpty())) {
