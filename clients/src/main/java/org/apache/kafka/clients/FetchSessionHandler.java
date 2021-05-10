@@ -91,7 +91,7 @@ public class FetchSessionHandler {
         return sessionTopicNames;
     }
 
-    private boolean requestUsedTopicIds = false;
+    private boolean canUseTopicIds = false;
 
     public static class FetchRequestData {
         /**
@@ -305,7 +305,7 @@ public class FetchSessionHandler {
                 topicIds.forEach((name, id) -> sessionTopicNames.put(id, name));
                 next = null;
                 topicIds = null;
-                requestUsedTopicIds = sessionTopicIds.keySet().containsAll(sessionPartitions.keySet().stream().map(
+                canUseTopicIds = sessionTopicIds.keySet().containsAll(sessionPartitions.keySet().stream().map(
                     tp -> tp.topic()).collect(Collectors.toSet()));
                 Map<TopicPartition, PartitionData> toSend =
                         Collections.unmodifiableMap(new LinkedHashMap<>(sessionPartitions));
@@ -313,7 +313,7 @@ public class FetchSessionHandler {
                         Collections.unmodifiableMap(new HashMap<>(sessionTopicIds));
                 Map<Uuid, String> toSendTopicNames =
                         Collections.unmodifiableMap(new HashMap<>(sessionTopicNames));
-                return new FetchRequestData(toSend, Collections.emptyList(), toSend, toSendTopicIds, toSendTopicNames, nextMetadata, requestUsedTopicIds);
+                return new FetchRequestData(toSend, Collections.emptyList(), toSend, toSendTopicIds, toSendTopicNames, nextMetadata, canUseTopicIds);
             }
 
             List<TopicPartition> added = new ArrayList<>();
@@ -373,12 +373,13 @@ public class FetchSessionHandler {
             Map<Uuid, String> toSendTopicNames =
                     Collections.unmodifiableMap(new HashMap<>(sessionTopicNames));
 
-            requestUsedTopicIds = requestUsedTopicIds && toSendTopicIds.keySet().containsAll(toSend.keySet().stream().map(
-                tp -> tp.topic()).collect(Collectors.toSet()));
+            canUseTopicIds = canUseTopicIds && toSendTopicIds.keySet().containsAll(toSend.keySet().stream().map(
+                tp -> tp.topic()).collect(Collectors.toSet())) || sessionTopicIds.keySet().containsAll(curSessionPartitions.keySet().stream().map(
+                    tp -> tp.topic()).collect(Collectors.toSet()));
             next = null;
             topicIds = null;
             return new FetchRequestData(toSend, Collections.unmodifiableList(removed), curSessionPartitions,
-                                        toSendTopicIds, toSendTopicNames, nextMetadata, requestUsedTopicIds);
+                                        toSendTopicIds, toSendTopicNames, nextMetadata, canUseTopicIds);
         }
     }
 
