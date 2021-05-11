@@ -287,11 +287,25 @@ public class FetchSessionHandler {
          * Mark that we want data from this partition in the upcoming fetch.
          */
         public void add(TopicPartition topicPartition, Uuid topicId, PartitionData data) {
-            if (next.put(topicPartition, data) == null) {
+            next.put(topicPartition, data);
+            // topicIds does not change between adding partitions and building, so we can use putIfAbsent
+            topicIds.putIfAbsent(topicPartition.topic(), topicId);
+        }
+
+        private void updateSessionTopicIds() {
+            topicIds.forEach((name, topicId) -> {
+                // Add new or updated topic IDs to the session if they are valid.
+                // If they are not valid, try to remove from the session.
                 if (!topicId.equals(Uuid.ZERO_UUID)) {
-                    topicIds.put(topicPartition.topic(), topicId);
+                    sessionTopicIds.put(name, topicId);
+                    sessionTopicNames.put(topicId, name);
+                } else {
+                    Uuid oldId = sessionTopicIds.remove(name);
+                    if (oldId != null) {
+                        sessionTopicNames.remove(oldId);
+                    }
                 }
-            }
+            });
         }
 
         public FetchRequestData build() {
@@ -301,8 +315,14 @@ public class FetchSessionHandler {
                               nextMetadata, node, partitionsToLogString(next.keySet()));
                 }
                 sessionPartitions = next;
-                sessionTopicIds = topicIds;
-                topicIds.forEach((name, id) -> sessionTopicNames.put(id, name));
+                sessionTopicIds = new HashMap<>(topicIds.size());
+                sessionTopicNames = new HashMap<>(topicIds.size());
+                topicIds.forEach((name, id) -> {
+                    if (!id.equals(Uuid.ZERO_UUID)) {
+                        sessionTopicIds.put(name, id);
+                        sessionTopicNames.put(id, name);
+                    }
+                });
                 next = null;
                 topicIds = null;
                 canUseTopicIds = sessionTopicIds.keySet().containsAll(sessionPartitions.keySet().stream().map(
@@ -352,11 +372,9 @@ public class FetchSessionHandler {
                 }
                 sessionPartitions.put(topicPartition, nextData);
                 added.add(topicPartition);
-                Uuid topicId = topicIds.getOrDefault(topicPartition.topic(), Uuid.ZERO_UUID);
-                if (!topicId.equals(Uuid.ZERO_UUID)) {
-                    sessionTopicIds.put(topicPartition.topic(), topicId);
-                }
             }
+            updateSessionTopicIds();
+
             if (log.isDebugEnabled()) {
                 log.debug("Built incremental fetch {} for node {}. Added {}, altered {}, removed {} " +
                           "out of {}", nextMetadata, node, partitionsToLogString(added),
@@ -369,13 +387,15 @@ public class FetchSessionHandler {
                     : Collections.unmodifiableMap(sessionPartitions);
             Map<String, Uuid> toSendTopicIds =
                     Collections.unmodifiableMap(new HashMap<>(sessionTopicIds));
-            toSendTopicIds.forEach((name, id) -> sessionTopicNames.put(id, name));
             Map<Uuid, String> toSendTopicNames =
                     Collections.unmodifiableMap(new HashMap<>(sessionTopicNames));
 
-            canUseTopicIds = canUseTopicIds && toSendTopicIds.keySet().containsAll(toSend.keySet().stream().map(
-                tp -> tp.topic()).collect(Collectors.toSet())) || sessionTopicIds.keySet().containsAll(curSessionPartitions.keySet().stream().map(
-                    tp -> tp.topic()).collect(Collectors.toSet()));
+            // If we already can use topic IDs, simply check all the toSend topics have an ID in toSendTopicIds
+            // Otherwise, check if all the partitions in the session have a corresponding ID so we can upgrade to use IDs.
+            canUseTopicIds = canUseTopicIds
+                    ? toSendTopicIds.keySet().containsAll(toSend.keySet().stream().map(tp -> tp.topic()).collect(Collectors.toSet()))
+                    : sessionTopicIds.keySet().containsAll(curSessionPartitions.keySet().stream().map(
+                        tp -> tp.topic()).collect(Collectors.toSet()));
             next = null;
             topicIds = null;
             return new FetchRequestData(toSend, Collections.unmodifiableList(removed), curSessionPartitions,
