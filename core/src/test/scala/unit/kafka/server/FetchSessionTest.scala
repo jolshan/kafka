@@ -656,7 +656,7 @@ class FetchSessionTest {
     resp1.responseData(topicNames, request1.version).forEach( (_, resp) => assertEquals(Errors.NONE.code, resp.errorCode))
   }
 
-  // This test simulates a session where the topic ID changes -- as though the topic is deleted and recreated.
+  // This test simulates a session where the topic ID changes broker side -- as though the topic is deleted and recreated.
   @Test
   def testFetchSessionUpdatesWithTopicIds(): Unit = {
     val time = new MockTime()
