@@ -270,6 +270,7 @@ public class FetchSessionHandler {
         private LinkedHashMap<TopicPartition, PartitionData> next;
         private Map<String, Uuid> topicIds;
         private final boolean copySessionPartitions;
+        private boolean missingTopicIds;
 
         Builder() {
             this.next = new LinkedHashMap<>();
@@ -291,7 +292,39 @@ public class FetchSessionHandler {
             // topicIds do not change between adding partitions and building, so we can use putIfAbsent
             if (!topicId.equals(Uuid.ZERO_UUID)) {
                 topicIds.putIfAbsent(topicPartition.topic(), topicId);
+            } else if (canUseTopicIds) {
+                // If we established that this session uses topic IDs and we were not provided an ID, mark the session as
+                // missingTopicIds
+                missingTopicIds = true;
             }
+        }
+
+        /**
+         * Check topic IDs. If we are not using topic IDs in the session and a topic ID is provided, close the session.
+         * If we are using topic IDs, we must make sure all topic IDs are consistent with those in the session.
+         * If we are using topic IDs, but they are not yet in the session, add them to the session.
+         *
+         * @return true if we should close the session due to inconsistent topic ID usage
+         */
+        public boolean processTopicIds() {
+            if (!canUseTopicIds) {
+                return !topicIds.isEmpty();
+            } else {
+                for (Map.Entry<String, Uuid> topic : topicIds.entrySet()) {
+                    String topicName = topic.getKey();
+                    Uuid addedId = topic.getValue();
+                    Uuid existingId = sessionTopicIds.getOrDefault(topicName, Uuid.ZERO_UUID);
+                    if (existingId.equals(Uuid.ZERO_UUID)) {
+                        sessionTopicIds.put(topicName, addedId);
+                        sessionTopicNames.put(addedId, topicName);
+                    } else {
+                        if (!existingId.equals(addedId)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         public FetchRequestData build() {
@@ -301,13 +334,16 @@ public class FetchSessionHandler {
                               nextMetadata, node, partitionsToLogString(next.keySet()));
                 }
                 sessionPartitions = next;
-                sessionTopicIds = topicIds;
-                sessionTopicNames = new HashMap<>(topicIds.size());
-                topicIds.forEach((name, id) -> sessionTopicNames.put(id, name));
                 next = null;
-                topicIds = null;
-                canUseTopicIds = sessionTopicIds.keySet().containsAll(sessionPartitions.keySet().stream().map(
+                canUseTopicIds = topicIds.keySet().containsAll(sessionPartitions.keySet().stream().map(
                     tp -> tp.topic()).collect(Collectors.toSet()));
+                // Only add topic IDs to the session if we are using topic IDs.
+                if (canUseTopicIds) {
+                    sessionTopicIds = topicIds;
+                    sessionTopicNames = new HashMap<>(topicIds.size());
+                    topicIds.forEach((name, id) -> sessionTopicNames.put(id, name));
+                }
+                topicIds = null;
                 Map<TopicPartition, PartitionData> toSend =
                         Collections.unmodifiableMap(new LinkedHashMap<>(sessionPartitions));
                 Map<String, Uuid> toSendTopicIds =
@@ -327,11 +363,6 @@ public class FetchSessionHandler {
                 PartitionData prevData = entry.getValue();
                 PartitionData nextData = next.remove(topicPartition);
                 if (nextData != null) {
-                    // If topic ID changed, close the session.
-                    if (!sessionTopicIds.getOrDefault(topicPartition.topic(), Uuid.ZERO_UUID).equals(
-                            topicIds.getOrDefault(topicPartition.topic(), Uuid.ZERO_UUID))) {
-                        nextMetadata = nextMetadata.nextCloseExisting();
-                    }
                     if (!prevData.equals(nextData)) {
                         // Re-add the altered partition to the end of 'next'
                         next.put(topicPartition, nextData);
@@ -357,28 +388,30 @@ public class FetchSessionHandler {
                     break;
                 }
                 sessionPartitions.put(topicPartition, nextData);
-                Uuid topicId = topicIds.getOrDefault(topicPartition.topic(), Uuid.ZERO_UUID);
-                if (!topicId.equals(Uuid.ZERO_UUID)) {
-                    if (!canUseTopicIds) {
-                        nextMetadata = nextMetadata.nextCloseExisting();
-                    } else {
-                        sessionTopicIds.put(topicPartition.topic(), topicId);
-                        sessionTopicNames.put(topicId, topicPartition.topic());
-                    }
-                } else {
-                    // If we were using topic IDs and an ID is missing, close the session.
-                    if (canUseTopicIds) {
-                        nextMetadata = nextMetadata.nextCloseExisting();
-                    }
-                }
                 added.add(topicPartition);
             }
 
+            // Check session topic IDs are consistent and add new IDs to the session.
+            boolean inconsistentTopicIds = processTopicIds();
+
+            // Close the session if we were missing topic IDs or had inconsistent topic IDs.
+            boolean closeSession = missingTopicIds || inconsistentTopicIds;
+
+            if (closeSession) {
+                nextMetadata = nextMetadata.nextCloseExisting();
+            }
+
             if (log.isDebugEnabled()) {
-                log.debug("Built incremental fetch {} for node {}. Added {}, altered {}, removed {} " +
-                          "out of {}", nextMetadata, node, partitionsToLogString(added),
-                          partitionsToLogString(altered), partitionsToLogString(removed),
-                          partitionsToLogString(sessionPartitions.keySet()));
+                if (closeSession) {
+                    log.debug("Built incremental fetch {} for node {}. Found inconsistent topic ID usage, so sending a " +
+                            "request to close the session", nextMetadata, node);
+
+                } else {
+                    log.debug("Built incremental fetch {} for node {}. Added {}, altered {}, removed {} " +
+                                    "out of {}", nextMetadata, node, partitionsToLogString(added),
+                            partitionsToLogString(altered), partitionsToLogString(removed),
+                            partitionsToLogString(sessionPartitions.keySet()));
+                }
             }
             Map<TopicPartition, PartitionData> toSend = Collections.unmodifiableMap(next);
             Map<TopicPartition, PartitionData> curSessionPartitions = copySessionPartitions
