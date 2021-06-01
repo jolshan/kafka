@@ -16,6 +16,8 @@
   */
 package kafka.admin
 
+import java.util
+
 import kafka.admin.TopicCommand.{AdminClientTopicService, TopicCommandOptions}
 import kafka.integration.KafkaServerTestHarness
 import kafka.server.{ConfigType, KafkaConfig}
@@ -35,8 +37,8 @@ import org.junit.jupiter.api.{AfterEach, BeforeEach, Test, TestInfo}
 import org.mockito.ArgumentMatcher
 import org.mockito.ArgumentMatchers.{eq => eqThat, _}
 import org.mockito.Mockito._
-
 import java.util.{Collections, Optional, Properties}
+
 import scala.collection.Seq
 import scala.concurrent.ExecutionException
 import scala.jdk.CollectionConverters._
@@ -768,7 +770,7 @@ class TopicCommandWithAdminClientTest extends KafkaServerTestHarness with Loggin
     when(adminClient.listTopics(any())).thenReturn(listResult)
 
     val result = AdminClientTestUtils.deleteTopicsResult(testTopicName, Errors.THROTTLING_QUOTA_EXCEEDED.exception())
-    when(adminClient.deleteTopics(any(), any())).thenReturn(result)
+    when(adminClient.deleteTopics(any[util.Collection[String]](), any())).thenReturn(result)
 
     val exception = assertThrows(classOf[ExecutionException],
       () => topicService.deleteTopic(new TopicCommandOptions(Array("--topic", testTopicName))))
