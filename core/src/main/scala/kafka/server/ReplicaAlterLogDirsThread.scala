@@ -22,16 +22,16 @@ import kafka.cluster.BrokerEndPoint
 import kafka.log.{LeaderOffsetIncremented, LogAppendInfo}
 import kafka.server.AbstractFetcherThread.{ReplicaFetch, ResultWithPartitions}
 import kafka.server.QuotaFactory.UnboundedQuota
-import org.apache.kafka.common.{TopicIdPartition, TopicPartition}
+import org.apache.kafka.common.{TopicIdPartition, TopicPartition, Uuid}
 import org.apache.kafka.common.errors.KafkaStorageException
 import org.apache.kafka.common.message.FetchResponseData
 import org.apache.kafka.common.message.OffsetForLeaderEpochResponseData.EpochEndOffset
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH
 import org.apache.kafka.common.requests.{FetchRequest, FetchResponse, RequestUtils}
-
 import java.util
 import java.util.Optional
+
 import scala.collection.{Map, Seq, Set, mutable}
 import scala.compat.java8.OptionConverters._
 import scala.jdk.CollectionConverters._
@@ -72,8 +72,8 @@ class ReplicaAlterLogDirsThread(name: String,
     replicaMgr.futureLocalLogOrException(topicPartition).endOffsetForEpoch(epoch)
   }
 
-  def fetchFromLeader(fetchRequest: FetchRequest.Builder): Map[TopicPartition, FetchData] = {
-    var partitionData: Seq[(TopicPartition, FetchData)] = null
+  def fetchFromLeader(fetchRequest: FetchRequest.Builder): Map[TopicIdPartition, FetchData] = {
+    var partitionData: Seq[(TopicIdPartition, FetchData)] = null
     val request = fetchRequest.build()
 
     val (topicIds, topicNames) = replicaMgr.metadataCache.topicIdInfo()
@@ -82,7 +82,7 @@ class ReplicaAlterLogDirsThread(name: String,
       partitionData = responsePartitionData.map { case (tp, data) =>
         val abortedTransactions = data.abortedTransactions.map(_.asJava).orNull
         val lastStableOffset = data.lastStableOffset.getOrElse(FetchResponse.INVALID_LAST_STABLE_OFFSET)
-        tp.topicPartition -> new FetchResponseData.PartitionData()
+        tp -> new FetchResponseData.PartitionData()
           .setPartitionIndex(tp.topicPartition.partition)
           .setErrorCode(data.error.code)
           .setHighWatermark(data.highWatermark)
@@ -260,7 +260,7 @@ class ReplicaAlterLogDirsThread(name: String,
   }
 
   private def buildFetchForPartition(tp: TopicPartition, fetchState: PartitionFetchState): ResultWithPartitions[Option[ReplicaFetch]] = {
-    val requestMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
+    val requestMap = new util.LinkedHashMap[TopicIdPartition, FetchRequest.PartitionData]
     val partitionsWithError = mutable.Set[TopicPartition]()
     val topicIds = replicaMgr.metadataCache.topicNamesToIds()
 
@@ -270,7 +270,7 @@ class ReplicaAlterLogDirsThread(name: String,
         fetchState.lastFetchedEpoch.map(_.asInstanceOf[Integer]).asJava
       else
         Optional.empty[Integer]
-      requestMap.put(tp, new FetchRequest.PartitionData(fetchState.fetchOffset, logStartOffset,
+      requestMap.put(new TopicIdPartition(topicIds.getOrDefault(tp.topic, Uuid.ZERO_UUID), tp), new FetchRequest.PartitionData(fetchState.fetchOffset, logStartOffset,
         fetchSize, Optional.of(fetchState.currentLeaderEpoch), lastFetchedEpoch))
     } catch {
       case e: KafkaStorageException =>
@@ -287,8 +287,7 @@ class ReplicaAlterLogDirsThread(name: String,
         ApiKeys.FETCH.latestVersion
       // Set maxWait and minBytes to 0 because the response should return immediately if
       // the future log has caught up with the current log of the partition
-      val requestBuilder = FetchRequest.Builder.forReplica(version, replicaId, 0, 0, requestMap,
-        topicIds).setMaxBytes(maxBytes)
+      val requestBuilder = FetchRequest.Builder.forReplica(version, replicaId, 0, 0, requestMap).setMaxBytes(maxBytes)
       Some(ReplicaFetch(requestMap, requestBuilder))
     }
 
