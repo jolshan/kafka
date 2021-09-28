@@ -32,6 +32,7 @@ import org.apache.kafka.common.requests.{FetchRequest, FetchResponse, RequestUti
 import java.util
 import java.util.Optional
 
+
 import scala.collection.{Map, Seq, Set, mutable}
 import scala.compat.java8.OptionConverters._
 import scala.jdk.CollectionConverters._
@@ -76,7 +77,15 @@ class ReplicaAlterLogDirsThread(name: String,
     var partitionData: Seq[(TopicIdPartition, FetchData)] = null
     val request = fetchRequest.build()
 
-    val (topicIds, topicNames) = replicaMgr.metadataCache.topicIdInfo()
+    // We can build the map from the request since it contains topic IDs and names.
+    // Only one ID can be associated with a name and vice versa.
+    val topicIds = new mutable.HashMap[String, Uuid]()
+    val topicNames = new mutable.HashMap[Uuid, String]()
+    request.data.topics.forEach { topic =>
+      topicIds.put(topic.topic, topic.topicId)
+      topicNames.put(topic.topicId, topic.topic)
+    }
+
 
     def processResponseCallback(responsePartitionData: Seq[(TopicIdPartition, FetchPartitionData)]): Unit = {
       partitionData = responsePartitionData.map { case (tp, data) =>
@@ -94,7 +103,7 @@ class ReplicaAlterLogDirsThread(name: String,
     }
 
     // Will throw UnknownTopicIdException if a topic ID is unknown.
-    val fetchData = request.fetchData(topicNames)
+    val fetchData = request.fetchData(topicNames.asJava)
 
     replicaMgr.fetchMessages(
       0L, // timeout is 0 so that the callback will be executed immediately
@@ -103,7 +112,7 @@ class ReplicaAlterLogDirsThread(name: String,
       request.maxBytes,
       false,
       fetchData.asScala.toSeq,
-      topicIds,
+      topicIds.asJava,
       UnboundedQuota,
       processResponseCallback,
       request.isolationLevel,
@@ -262,7 +271,6 @@ class ReplicaAlterLogDirsThread(name: String,
   private def buildFetchForPartition(tp: TopicPartition, fetchState: PartitionFetchState): ResultWithPartitions[Option[ReplicaFetch]] = {
     val requestMap = new util.LinkedHashMap[TopicIdPartition, FetchRequest.PartitionData]
     val partitionsWithError = mutable.Set[TopicPartition]()
-    val topicIds = replicaMgr.metadataCache.topicNamesToIds()
 
     try {
       val logStartOffset = replicaMgr.futureLocalLogOrException(tp).logStartOffset
@@ -270,7 +278,7 @@ class ReplicaAlterLogDirsThread(name: String,
         fetchState.lastFetchedEpoch.map(_.asInstanceOf[Integer]).asJava
       else
         Optional.empty[Integer]
-      requestMap.put(new TopicIdPartition(topicIds.getOrDefault(tp.topic, Uuid.ZERO_UUID), tp), new FetchRequest.PartitionData(fetchState.fetchOffset, logStartOffset,
+      requestMap.put(new TopicIdPartition(fetchState.topicId.getOrElse(Uuid.ZERO_UUID), tp), new FetchRequest.PartitionData(fetchState.fetchOffset, logStartOffset,
         fetchSize, Optional.of(fetchState.currentLeaderEpoch), lastFetchedEpoch))
     } catch {
       case e: KafkaStorageException =>
@@ -281,7 +289,7 @@ class ReplicaAlterLogDirsThread(name: String,
     val fetchRequestOpt = if (requestMap.isEmpty) {
       None
     } else {
-      val version: Short = if (topicIds.containsKey(tp.topic()))
+      val version: Short = if (fetchState.topicId.isEmpty)
         12
       else
         ApiKeys.FETCH.latestVersion
