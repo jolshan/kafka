@@ -571,7 +571,8 @@ class UnifiedLog(@volatile var logStartOffset: Long,
       case Some(currentId) =>
         if (!currentId.equals(topicId)) {
           throw new InconsistentTopicIdException(s"Tried to assign topic ID $topicId to log for topic partition $topicPartition," +
-            s"but log already contained topic ID $currentId")
+            s"but log already contained topic ID $currentId. This may occur when a topic is deleted and recreated or when using" +
+            s"tooling with the `--zookeeper` flag.")
         }
 
       case None =>
@@ -582,6 +583,8 @@ class UnifiedLog(@volatile var logStartOffset: Long,
               if (!partMetadataFile.exists()) {
                 partMetadataFile.record(topicId)
                 scheduler.schedule("flush-metadata-file", maybeFlushMetadataFile)
+              } else {
+                debug("Partition metadata file already existed, but topic ID in memory was not defined.")
               }
             case _ => warn(s"The topic id $topicId will not be persisted to the partition metadata file " +
               "since the partition is deleted")
