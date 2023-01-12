@@ -38,7 +38,7 @@ import org.apache.kafka.common.record._
 import org.apache.kafka.common.requests.ListOffsetsRequest
 import org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH_OFFSET
 import org.apache.kafka.common.requests.ProduceResponse.RecordError
-import org.apache.kafka.common.utils.{PrimitiveRef, Time, Utils}
+import org.apache.kafka.common.utils.{LogContext, PrimitiveRef, Time, Utils}
 import org.apache.kafka.common.{InvalidRecordException, KafkaException, TopicPartition, Uuid}
 import org.apache.kafka.server.common.MetadataVersion
 import org.apache.kafka.server.common.MetadataVersion.IBP_0_10_0_IV0
@@ -250,7 +250,8 @@ class UnifiedLog(@volatile var logStartOffset: Long,
 
   import kafka.log.UnifiedLog._
 
-  this.logIdent = s"[UnifiedLog partition=$topicPartition, dir=$parentDir] "
+  private val logContext = new LogContext(s"[UnifiedLog partition=$topicPartition, dir=$parentDir] ")
+  this.logIdent = logContext.logPrefix()
 
   /* A lock that guards all modifications to the log */
   private val lock = new Object
@@ -692,6 +693,10 @@ class UnifiedLog(@volatile var logStartOffset: Long,
       val lastRecord = new LastRecord(lastDataOffset, producerIdEntry.producerEpoch)
       producerId -> lastRecord
     }
+  }
+
+  def hasOngoingTransaction(producerId: Long): Boolean = lock synchronized {
+    producerStateManager.activeProducers.get(producerId).map(_.currentTxnFirstOffset).isDefined
   }
 
   /**

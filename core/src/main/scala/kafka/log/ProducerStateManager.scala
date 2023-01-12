@@ -594,10 +594,6 @@ class ProducerStateManager(
   }
 }
 
-
-
-
-
 class ProducerStateManagerConfig(@volatile var producerIdExpirationMs: Int) extends Logging with BrokerReconfigurable {
 
   override def reconfigurableConfigs: Set[String] = ProducerStateManagerConfig.ReconfigurableConfigs

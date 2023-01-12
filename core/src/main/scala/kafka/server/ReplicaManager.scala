@@ -598,11 +598,12 @@ class ReplicaManager(val config: KafkaConfig,
                     responseCallback: Map[TopicPartition, PartitionResponse] => Unit,
                     delayedProduceLock: Option[Lock] = None,
                     recordConversionStatsCallback: Map[TopicPartition, RecordConversionStats] => Unit = _ => (),
-                    requestLocal: RequestLocal = RequestLocal.NoCaching): Unit = {
+                    requestLocal: RequestLocal = RequestLocal.NoCaching,
+                    transactionStatePartition: Option[Int] = None): Unit = {
     if (isValidRequiredAcks(requiredAcks)) {
       val sTime = time.milliseconds
       val localProduceResults = appendToLocalLog(internalTopicsAllowed = internalTopicsAllowed,
-        origin, entriesPerPartition, requiredAcks, requestLocal)
+        origin, entriesPerPartition, requiredAcks, requestLocal, transactionStatePartition)
       debug("Produce to local log in %d ms".format(time.milliseconds - sTime))
 
       val produceStatus = localProduceResults.map { case (topicPartition, result) =>
@@ -930,7 +931,8 @@ class ReplicaManager(val config: KafkaConfig,
                                origin: AppendOrigin,
                                entriesPerPartition: Map[TopicPartition, MemoryRecords],
                                requiredAcks: Short,
-                               requestLocal: RequestLocal): Map[TopicPartition, LogAppendResult] = {
+                               requestLocal: RequestLocal,
+                               transactionStatePartition: Option[Int] = None): Map[TopicPartition, LogAppendResult] = {
     val traceEnabled = isTraceEnabled
     def processFailedRecord(topicPartition: TopicPartition, t: Throwable) = {
       val logStartOffset = onlinePartition(topicPartition).map(_.logStartOffset).getOrElse(-1L)
@@ -956,20 +958,47 @@ class ReplicaManager(val config: KafkaConfig,
       } else {
         try {
           val partition = getPartitionOrException(topicPartition)
-          val info = partition.appendRecordsToLeader(records, origin, requiredAcks, requestLocal)
-          val numAppendedMessages = info.numMessages
 
-          // update stats for successfully appended bytes and messages as bytesInRate and messageInRate
-          brokerTopicStats.topicStats(topicPartition.topic).bytesInRate.mark(records.sizeInBytes)
-          brokerTopicStats.allTopicsStats.bytesInRate.mark(records.sizeInBytes)
-          brokerTopicStats.topicStats(topicPartition.topic).messagesInRate.mark(numAppendedMessages)
-          brokerTopicStats.allTopicsStats.messagesInRate.mark(numAppendedMessages)
+          // Check if transaction is ongoing if a transactional ID is present
+          if (transactionStatePartition.isEmpty || partition.hasOngoingTransaction(records.firstBatch().producerId())) {
+            val info = partition.appendRecordsToLeader(records, origin, requiredAcks, requestLocal)
+            val numAppendedMessages = info.numMessages
 
-          if (traceEnabled)
-            trace(s"${records.sizeInBytes} written to log $topicPartition beginning at offset " +
-              s"${info.firstOffset.getOrElse(-1)} and ending at offset ${info.lastOffset}")
+            // update stats for successfully appended bytes and messages as bytesInRate and messageInRate
+            brokerTopicStats.topicStats(topicPartition.topic).bytesInRate.mark(records.sizeInBytes)
+            brokerTopicStats.allTopicsStats.bytesInRate.mark(records.sizeInBytes)
+            brokerTopicStats.topicStats(topicPartition.topic).messagesInRate.mark(numAppendedMessages)
+            brokerTopicStats.allTopicsStats.messagesInRate.mark(numAppendedMessages)
 
-          (topicPartition, LogAppendResult(info))
+            if (traceEnabled)
+              trace(s"${records.sizeInBytes} written to log $topicPartition beginning at offset " +
+                s"${info.firstOffset.getOrElse(-1)} and ending at offset ${info.lastOffset}")
+
+            (topicPartition, LogAppendResult(info))
+          } else {
+            // We know transactionStatePartition is defined.
+            val (error, node) = getCoordinator(transactionStatePartition.get)
+
+            if (error != Errors.NONE) {
+              throw error.exception() // TODO: handle these exceptions
+            }
+            // Send request to coordinator to check if transaction is ongoing
+            // Check if transaction is ongoing if a transactional ID is present
+            val info = partition.appendRecordsToLeader(records, origin, requiredAcks, requestLocal)
+            val numAppendedMessages = info.numMessages
+
+            // update stats for successfully appended bytes and messages as bytesInRate and messageInRate
+            brokerTopicStats.topicStats(topicPartition.topic).bytesInRate.mark(records.sizeInBytes)
+            brokerTopicStats.allTopicsStats.bytesInRate.mark(records.sizeInBytes)
+            brokerTopicStats.topicStats(topicPartition.topic).messagesInRate.mark(numAppendedMessages)
+            brokerTopicStats.allTopicsStats.messagesInRate.mark(numAppendedMessages)
+
+            if (traceEnabled)
+              trace(s"${records.sizeInBytes} written to log $topicPartition beginning at offset " +
+                s"${info.firstOffset.getOrElse(-1)} and ending at offset ${info.lastOffset}")
+
+            (topicPartition, LogAppendResult(info))
+          }
         } catch {
           // NOTE: Failed produce requests metric is not incremented for known exceptions
           // it is supposed to indicate un-expected failures of a broker in handling a produce request
@@ -2267,6 +2296,34 @@ class ReplicaManager(val config: KafkaConfig,
         case e: Throwable =>
           stateChangeLogger.error(s"Unable to delete stray replica $topicPartition because " +
             s"we got an unexpected ${e.getClass.getName} exception: ${e.getMessage}", e)
+      }
+    }
+  }
+
+  def getCoordinator(partition: Int): (Errors, Node) = {
+    val listenerName = config.interBrokerListenerName
+
+    val topicMetadata = metadataCache.getTopicMetadata(Set(Topic.TRANSACTION_STATE_TOPIC_NAME), listenerName)
+
+    if (topicMetadata.headOption.isEmpty) {
+      // If topic is not created, then the transaction is definitely not started.
+      (Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode)
+    } else {
+      if (topicMetadata.head.errorCode != Errors.NONE.code) {
+        (Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode)
+      } else {
+        val coordinatorEndpoint = topicMetadata.head.partitions.asScala
+          .find(_.partitionIndex == partition)
+          .filter(_.leaderId != MetadataResponse.NO_LEADER_ID)
+          .flatMap(metadata => metadataCache.
+            getAliveBrokerNode(metadata.leaderId, listenerName))
+
+        coordinatorEndpoint match {
+          case Some(endpoint) =>
+            (Errors.NONE, endpoint)
+          case _ =>
+            (Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode)
+        }
       }
     }
   }
