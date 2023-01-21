@@ -124,7 +124,7 @@ class AutoTopicCreationManagerTest {
 
     Mockito.verify(brokerToController).sendRequest(
       ArgumentMatchers.eq(requestBody),
-      any(classOf[ControllerRequestCompletionHandler]))
+      any(classOf[InterBrokerRequestCompletionHandler]))
   }
 
   @Test
@@ -251,7 +251,7 @@ class AutoTopicCreationManagerTest {
     val argumentCaptor = ArgumentCaptor.forClass(classOf[AbstractRequest.Builder[_ <: AbstractRequest]])
     Mockito.verify(brokerToController).sendRequest(
       argumentCaptor.capture(),
-      any(classOf[ControllerRequestCompletionHandler]))
+      any(classOf[InterBrokerRequestCompletionHandler]))
     val capturedRequest = argumentCaptor.getValue.asInstanceOf[EnvelopeRequest.Builder].build(ApiKeys.ENVELOPE.latestVersion())
     assertEquals(userPrincipal, SecurityUtils.parseKafkaPrincipal(Utils.utf8(capturedRequest.requestPrincipal)))
   }
@@ -285,7 +285,7 @@ class AutoTopicCreationManagerTest {
       Set(topicName), UnboundedControllerMutationQuota, Some(requestContext))
 
     // Should only trigger once
-    val argumentCaptor = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val argumentCaptor = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
     Mockito.verify(brokerToController).sendRequest(
       any(classOf[AbstractRequest.Builder[_ <: AbstractRequest]]),
       argumentCaptor.capture())

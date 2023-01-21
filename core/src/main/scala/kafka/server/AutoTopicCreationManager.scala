@@ -169,7 +169,7 @@ class DefaultAutoTopicCreationManager(
         .setTopics(topicsToCreate)
     )
 
-    val requestCompletionHandler = new ControllerRequestCompletionHandler {
+    val requestCompletionHandler = new InterBrokerRequestCompletionHandler {
       override def onTimeout(): Unit = {
         clearInflightRequests(creatableTopics)
         debug(s"Auto topic creation timed out for ${creatableTopics.keys}.")

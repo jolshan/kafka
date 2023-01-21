@@ -105,7 +105,7 @@ class AlterPartitionManagerTest {
   def testOverwriteWithinBatch(metadataVersion: MetadataVersion): Unit = {
     val canUseTopicIds = metadataVersion.isAtLeast(MetadataVersion.IBP_2_8_IV0)
     val capture: ArgumentCaptor[AbstractRequest.Builder[AlterPartitionRequest]] = ArgumentCaptor.forClass(classOf[AbstractRequest.Builder[AlterPartitionRequest]])
-    val callbackCapture: ArgumentCaptor[ControllerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture: ArgumentCaptor[InterBrokerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     val scheduler = new MockScheduler(time)
     val alterPartitionManager = new DefaultAlterPartitionManager(brokerToController, scheduler, time, brokerId, () => 2, () => metadataVersion)
@@ -145,7 +145,7 @@ class AlterPartitionManagerTest {
   @MethodSource(Array("provideMetadataVersions"))
   def testSingleBatch(metadataVersion: MetadataVersion): Unit = {
     val capture: ArgumentCaptor[AbstractRequest.Builder[AlterPartitionRequest]] = ArgumentCaptor.forClass(classOf[AbstractRequest.Builder[AlterPartitionRequest]])
-    val callbackCapture: ArgumentCaptor[ControllerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture: ArgumentCaptor[InterBrokerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     val scheduler = new MockScheduler(time)
     val alterPartitionManager = new DefaultAlterPartitionManager(brokerToController, scheduler, time, brokerId, () => 2, () => metadataVersion)
@@ -190,7 +190,7 @@ class AlterPartitionManagerTest {
     val partitionEpoch = 10
     val isr = List(1, 2, 3)
     val leaderAndIsr = new LeaderAndIsr(leaderId, leaderEpoch, isr, LeaderRecoveryState.RECOVERED, partitionEpoch)
-    val callbackCapture = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     val scheduler = new MockScheduler(time)
     val alterPartitionManager = new DefaultAlterPartitionManager(brokerToController, scheduler, time, brokerId, () => 2, () => IBP_3_2_IV0)
@@ -264,7 +264,7 @@ class AlterPartitionManagerTest {
 
   private def testRetryOnErrorResponse(response: ClientResponse): Unit = {
     val leaderAndIsr = new LeaderAndIsr(1, 1, List(1, 2, 3), LeaderRecoveryState.RECOVERED, 10)
-    val callbackCapture: ArgumentCaptor[ControllerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture: ArgumentCaptor[InterBrokerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     val scheduler = new MockScheduler(time)
     val alterPartitionManager = new DefaultAlterPartitionManager(brokerToController, scheduler, time, brokerId, () => 2, () => IBP_3_2_IV0)
@@ -322,7 +322,7 @@ class AlterPartitionManagerTest {
   }
 
   private def testPartitionError(tp: TopicIdPartition, error: Errors): AlterPartitionManager = {
-    val callbackCapture: ArgumentCaptor[ControllerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture: ArgumentCaptor[InterBrokerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
     reset(brokerToController)
 
     val scheduler = new MockScheduler(time)
@@ -346,7 +346,7 @@ class AlterPartitionManagerTest {
   @ParameterizedTest
   @MethodSource(Array("provideMetadataVersions"))
   def testOneInFlight(metadataVersion: MetadataVersion): Unit = {
-    val callbackCapture: ArgumentCaptor[ControllerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+    val callbackCapture: ArgumentCaptor[InterBrokerRequestCompletionHandler] = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     val scheduler = new MockScheduler(time)
     val alterPartitionManager = new DefaultAlterPartitionManager(brokerToController, scheduler, time, brokerId, () => 2, () => metadataVersion)
@@ -508,8 +508,8 @@ class AlterPartitionManagerTest {
   private def verifySendRequest(
     brokerToController: BrokerToControllerChannelManager,
     expectedRequest: ArgumentMatcher[AbstractRequest.Builder[_ <: AbstractRequest]]
-  ): ControllerRequestCompletionHandler = {
-    val callbackCapture = ArgumentCaptor.forClass(classOf[ControllerRequestCompletionHandler])
+  ): InterBrokerRequestCompletionHandler = {
+    val callbackCapture = ArgumentCaptor.forClass(classOf[InterBrokerRequestCompletionHandler])
 
     Mockito.verify(brokerToController).sendRequest(
       ArgumentMatchers.argThat(expectedRequest),

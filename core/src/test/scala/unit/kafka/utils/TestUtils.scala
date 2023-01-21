@@ -2322,7 +2322,7 @@ object TestUtils extends Logging {
   }
 
   class TestControllerRequestCompletionHandler(expectedResponse: Option[AbstractResponse] = None)
-    extends ControllerRequestCompletionHandler {
+    extends InterBrokerRequestCompletionHandler {
     var actualResponse: Option[ClientResponse] = Option.empty
     val completed: AtomicBoolean = new AtomicBoolean(false)
     val timedOut: AtomicBoolean = new AtomicBoolean(false)

@@ -16,7 +16,7 @@
  */
 package kafka.coordinator.transaction
 
-import kafka.server.{BrokerToControllerChannelManager, ControllerRequestCompletionHandler}
+import kafka.server.{BrokerToControllerChannelManager, InterBrokerRequestCompletionHandler}
 import kafka.utils.Logging
 import kafka.zk.{KafkaZkClient, ProducerIdBlockZNode}
 import org.apache.kafka.clients.ClientResponse
@@ -197,7 +197,7 @@ class RPCProducerIdManager(brokerId: Int,
 
     val request = new AllocateProducerIdsRequest.Builder(message)
     debug("Requesting next Producer ID block")
-    controllerChannel.sendRequest(request, new ControllerRequestCompletionHandler() {
+    controllerChannel.sendRequest(request, new InterBrokerRequestCompletionHandler() {
       override def onComplete(response: ClientResponse): Unit = {
         val message = response.responseBody().asInstanceOf[AllocateProducerIdsResponse]
         handleAllocateProducerIdsResponse(message)

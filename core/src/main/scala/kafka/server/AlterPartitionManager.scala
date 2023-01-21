@@ -193,7 +193,7 @@ class DefaultAlterPartitionManager(
     // until a response is received, or a new LeaderAndIsr overwrites the existing isrState
     // which causes the response for those partitions to be ignored.
     controllerChannelManager.sendRequest(request,
-      new ControllerRequestCompletionHandler {
+      new InterBrokerRequestCompletionHandler {
         override def onComplete(response: ClientResponse): Unit = {
           debug(s"Received AlterPartition response $response")
           val error = try {

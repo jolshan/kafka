@@ -17,7 +17,7 @@
 
 package unit.kafka.server
 
-import kafka.server.{BrokerToControllerChannelManager, ControllerInformation, ControllerNodeProvider, ControllerRequestCompletionHandler}
+import kafka.server.{BrokerToControllerChannelManager, ControllerInformation, ControllerNodeProvider, InterBrokerRequestCompletionHandler}
 import kafka.test.ClusterInstance
 import kafka.test.annotation.{ClusterConfigProperty, ClusterTest, Type}
 import kafka.test.junit.ClusterTestExtensions
@@ -79,7 +79,7 @@ class BrokerRegistrationRequestTest {
     req: BrokerRegistrationRequestData
   ): BrokerRegistrationResponseData = {
     val responseFuture = new CompletableFuture[BrokerRegistrationResponseData]()
-    channelManager.sendRequest(new BrokerRegistrationRequest.Builder(req), new ControllerRequestCompletionHandler() {
+    channelManager.sendRequest(new BrokerRegistrationRequest.Builder(req), new InterBrokerRequestCompletionHandler() {
       override def onTimeout(): Unit = responseFuture.completeExceptionally(new TimeoutException())
 
       override def onComplete(response: ClientResponse): Unit =

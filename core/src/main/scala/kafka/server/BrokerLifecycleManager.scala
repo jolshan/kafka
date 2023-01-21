@@ -317,7 +317,7 @@ class BrokerLifecycleManager(
       new BrokerRegistrationResponseHandler())
   }
 
-  private class BrokerRegistrationResponseHandler extends ControllerRequestCompletionHandler {
+  private class BrokerRegistrationResponseHandler extends InterBrokerRequestCompletionHandler {
     override def onComplete(response: ClientResponse): Unit = {
       if (response.authenticationException() != null) {
         error(s"Unable to register broker $nodeId because of an authentication exception.",
@@ -373,7 +373,7 @@ class BrokerLifecycleManager(
       new BrokerHeartbeatResponseHandler())
   }
 
-  private class BrokerHeartbeatResponseHandler extends ControllerRequestCompletionHandler {
+  private class BrokerHeartbeatResponseHandler extends InterBrokerRequestCompletionHandler {
     override def onComplete(response: ClientResponse): Unit = {
       if (response.authenticationException() != null) {
         error(s"Unable to send broker heartbeat for $nodeId because of an " +

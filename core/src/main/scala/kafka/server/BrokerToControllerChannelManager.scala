@@ -19,7 +19,7 @@ package kafka.server
 
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.atomic.AtomicReference
-import kafka.common.{InterBrokerSendThread, RequestAndCompletionHandler}
+import kafka.network.NetworkUtils.GenericSendThread
 import kafka.raft.RaftManager
 import kafka.server.metadata.ZkMetadataCache
 import kafka.utils.Logging
@@ -27,7 +27,6 @@ import org.apache.kafka.clients._
 import org.apache.kafka.common.{Node, Reconfigurable}
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.network._
-import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.AbstractRequest
 import org.apache.kafka.common.security.JaasContext
 import org.apache.kafka.common.security.auth.SecurityProtocol
@@ -157,7 +156,7 @@ trait BrokerToControllerChannelManager {
   def controllerApiVersions(): Option[NodeApiVersions]
   def sendRequest(
     request: AbstractRequest.Builder[_ <: AbstractRequest],
-    callback: ControllerRequestCompletionHandler
+    callback: InterBrokerRequestCompletionHandler
   ): Unit
 }
 
@@ -263,9 +262,9 @@ class BrokerToControllerChannelManagerImpl(
    */
   def sendRequest(
     request: AbstractRequest.Builder[_ <: AbstractRequest],
-    callback: ControllerRequestCompletionHandler
+    callback: InterBrokerRequestCompletionHandler
   ): Unit = {
-    requestThread.enqueue(BrokerToControllerQueueItem(
+    requestThread.enqueue(InterBrokerQueueItem(
       time.milliseconds(),
       request,
       callback
@@ -279,7 +278,7 @@ class BrokerToControllerChannelManagerImpl(
   }
 }
 
-abstract class ControllerRequestCompletionHandler extends RequestCompletionHandler {
+abstract class InterBrokerRequestCompletionHandler extends RequestCompletionHandler {
 
   /**
    * Fire when the request transmission time passes the caller defined deadline on the channel queue.
@@ -288,10 +287,10 @@ abstract class ControllerRequestCompletionHandler extends RequestCompletionHandl
   def onTimeout(): Unit
 }
 
-case class BrokerToControllerQueueItem(
+case class InterBrokerQueueItem(
   createdTimeMs: Long,
   request: AbstractRequest.Builder[_ <: AbstractRequest],
-  callback: ControllerRequestCompletionHandler
+  callback: InterBrokerRequestCompletionHandler
 )
 
 class BrokerToControllerRequestThread(
@@ -304,7 +303,7 @@ class BrokerToControllerRequestThread(
   time: Time,
   threadName: String,
   retryTimeoutMs: Long
-) extends InterBrokerSendThread(
+) extends GenericSendThread (
   threadName,
   initialNetworkClient,
   Math.min(Int.MaxValue, Math.min(config.controllerSocketTimeoutMs, retryTimeoutMs)).toInt,
@@ -328,7 +327,7 @@ class BrokerToControllerRequestThread(
     }
   }
 
-  private val requestQueue = new LinkedBlockingDeque[BrokerToControllerQueueItem]()
+  private val requestQueue = new LinkedBlockingDeque[InterBrokerQueueItem]()
   private val activeController = new AtomicReference[Node](null)
 
   // Used for testing
@@ -343,7 +342,16 @@ class BrokerToControllerRequestThread(
     activeController.set(newActiveController)
   }
 
-  def enqueue(request: BrokerToControllerQueueItem): Unit = {
+  override def receivingNode(): Option[Node] = {
+    activeControllerAddress()
+  }
+
+  override def updateReceivingNode(newActiveController: Node): Unit = {
+    updateControllerAddress(newActiveController)
+  }
+
+
+  def enqueue(request: InterBrokerQueueItem): Unit = {
     if (!started) {
       throw new IllegalStateException("Cannot enqueue a request if the request thread is not running")
     }
@@ -355,55 +363,6 @@ class BrokerToControllerRequestThread(
 
   def queueSize: Int = {
     requestQueue.size
-  }
-
-  override def generateRequests(): Iterable[RequestAndCompletionHandler] = {
-    val currentTimeMs = time.milliseconds()
-    val requestIter = requestQueue.iterator()
-    while (requestIter.hasNext) {
-      val request = requestIter.next
-      if (currentTimeMs - request.createdTimeMs >= retryTimeoutMs) {
-        requestIter.remove()
-        request.callback.onTimeout()
-      } else {
-        val controllerAddress = activeControllerAddress()
-        if (controllerAddress.isDefined) {
-          requestIter.remove()
-          return Some(RequestAndCompletionHandler(
-            time.milliseconds(),
-            controllerAddress.get,
-            request.request,
-            handleResponse(request)
-          ))
-        }
-      }
-    }
-    None
-  }
-
-  private[server] def handleResponse(queueItem: BrokerToControllerQueueItem)(response: ClientResponse): Unit = {
-    if (response.authenticationException != null) {
-      error(s"Request ${queueItem.request} failed due to authentication error with controller",
-        response.authenticationException)
-      queueItem.callback.onComplete(response)
-    } else if (response.versionMismatch != null) {
-      error(s"Request ${queueItem.request} failed due to unsupported version error",
-        response.versionMismatch)
-      queueItem.callback.onComplete(response)
-    } else if (response.wasDisconnected()) {
-      updateControllerAddress(null)
-      requestQueue.putFirst(queueItem)
-    } else if (response.responseBody().errorCounts().containsKey(Errors.NOT_CONTROLLER)) {
-      // just close the controller connection and wait for metadata cache update in doWork
-      activeControllerAddress().foreach { controllerAddress =>
-        networkClient.disconnect(controllerAddress.idString)
-        updateControllerAddress(null)
-      }
-
-      requestQueue.putFirst(queueItem)
-    } else {
-      queueItem.callback.onComplete(response)
-    }
   }
 
   override def doWork(): Unit = {

@@ -63,7 +63,7 @@ class BrokerToControllerRequestThreadTest {
     testRequestThread.started = true
 
     val completionHandler = new TestControllerRequestCompletionHandler(None)
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler
@@ -102,7 +102,7 @@ class BrokerToControllerRequestThreadTest {
     mockClient.prepareResponse(expectedResponse)
 
     val completionHandler = new TestControllerRequestCompletionHandler(Some(expectedResponse))
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler
@@ -145,7 +145,7 @@ class BrokerToControllerRequestThreadTest {
     testRequestThread.started = true
 
     val completionHandler = new TestControllerRequestCompletionHandler(Some(expectedResponse))
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler,
@@ -197,7 +197,7 @@ class BrokerToControllerRequestThreadTest {
     testRequestThread.started = true
 
     val completionHandler = new TestControllerRequestCompletionHandler(Some(expectedResponse))
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()
         .setAllowAutoTopicCreation(true)),
@@ -271,7 +271,7 @@ class BrokerToControllerRequestThreadTest {
     val envelopeRequestBuilder = new EnvelopeRequest.Builder(ByteBuffer.allocate(0),
       kafkaPrincipalBuilder.serialize(kafkaPrincipal), "client-address".getBytes)
 
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       envelopeRequestBuilder,
       completionHandler
@@ -327,7 +327,7 @@ class BrokerToControllerRequestThreadTest {
     testRequestThread.started = true
 
     val completionHandler = new TestControllerRequestCompletionHandler()
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()
         .setAllowAutoTopicCreation(true)),
@@ -367,12 +367,12 @@ class BrokerToControllerRequestThreadTest {
     when(controllerNodeProvider.getControllerInfo()).thenReturn(controllerInfo(Some(activeController)))
 
     val callbackResponse = new AtomicReference[ClientResponse]()
-    val completionHandler = new ControllerRequestCompletionHandler {
+    val completionHandler = new InterBrokerRequestCompletionHandler {
       override def onTimeout(): Unit = fail("Unexpected timeout exception")
       override def onComplete(response: ClientResponse): Unit = callbackResponse.set(response)
     }
 
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler
@@ -405,12 +405,12 @@ class BrokerToControllerRequestThreadTest {
     when(controllerNodeProvider.getControllerInfo()).thenReturn(controllerInfo(Some(activeController)))
 
     val callbackResponse = new AtomicReference[ClientResponse]()
-    val completionHandler = new ControllerRequestCompletionHandler {
+    val completionHandler = new InterBrokerRequestCompletionHandler {
       override def onTimeout(): Unit = fail("Unexpected timeout exception")
       override def onComplete(response: ClientResponse): Unit = callbackResponse.set(response)
     }
 
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler
@@ -445,7 +445,7 @@ class BrokerToControllerRequestThreadTest {
       controllerNodeProvider, config, time, "", retryTimeoutMs = Long.MaxValue)
 
     val completionHandler = new TestControllerRequestCompletionHandler(None)
-    val queueItem = BrokerToControllerQueueItem(
+    val queueItem = InterBrokerQueueItem(
       time.milliseconds(),
       new MetadataRequest.Builder(new MetadataRequestData()),
       completionHandler

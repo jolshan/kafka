@@ -2084,11 +2084,11 @@ class PartitionTest extends AbstractPartitionTest {
 
     when(mockChannelManager.sendRequest(any(), any()))
       .thenAnswer { invocation =>
-        val controllerRequestCompletionHandler = invocation.getArguments()(1).asInstanceOf[ControllerRequestCompletionHandler]
+        val controllerRequestCompletionHandler = invocation.getArguments()(1).asInstanceOf[InterBrokerRequestCompletionHandler]
         controllerRequestCompletionHandler.onComplete(alterPartitionResponseWithUnknownServerError)
       }
       .thenAnswer { invocation =>
-        val controllerRequestCompletionHandler = invocation.getArguments()(1).asInstanceOf[ControllerRequestCompletionHandler]
+        val controllerRequestCompletionHandler = invocation.getArguments()(1).asInstanceOf[InterBrokerRequestCompletionHandler]
         controllerRequestCompletionHandler.onComplete(alterPartitionResponseWithoutError)
       }
 

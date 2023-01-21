@@ -116,7 +116,7 @@ class ForwardingManagerImpl(
   ): Unit = {
     val envelopeRequest = ForwardingManager.buildEnvelopeRequest(requestContext, requestBufferCopy)
 
-    class ForwardingResponseHandler extends ControllerRequestCompletionHandler {
+    class ForwardingResponseHandler extends InterBrokerRequestCompletionHandler {
       override def onComplete(clientResponse: ClientResponse): Unit = {
 
         if (clientResponse.versionMismatch != null) {
