@@ -982,8 +982,9 @@ class ReplicaManager(val config: KafkaConfig,
             if (error != Errors.NONE) {
               throw error.exception() // TODO: handle these exceptions
             }
-            // Send request to coordinator to check if transaction is ongoing
-            // Check if transaction is ongoing if a transactional ID is present
+            // Send request to coordinator to check if transaction is ongoing -- add the request to a queue that will be sent 
+            // when it is ready.
+            // Change the below to handle correctly -- (current code was added in order to compile)
             val info = partition.appendRecordsToLeader(records, origin, requiredAcks, requestLocal)
             val numAppendedMessages = info.numMessages
 
