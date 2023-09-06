@@ -25,7 +25,6 @@ import org.apache.kafka.common.record.RecordBatch
 
 import scala.collection.{immutable, mutable}
 
-
 object TransactionState {
   val AllStates = Set(
     Empty,
