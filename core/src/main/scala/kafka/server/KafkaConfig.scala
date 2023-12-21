@@ -201,7 +201,7 @@ object Defaults {
   val TransactionsAbortTimedOutTransactionsCleanupIntervalMS = TransactionStateManager.DefaultAbortTimedOutTransactionsIntervalMs
   val TransactionsRemoveExpiredTransactionsCleanupIntervalMS = TransactionStateManager.DefaultRemoveExpiredTransactionalIdsIntervalMs
 
-  val TransactionPartitionVerificationEnable = true
+  val TransactionPartitionVerificationEnable = false
 
   val ProducerIdExpirationMs = 86400000
   val ProducerIdExpirationCheckIntervalMs = 600000
