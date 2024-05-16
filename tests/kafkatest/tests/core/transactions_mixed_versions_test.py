@@ -21,7 +21,7 @@ from kafkatest.services.transactional_message_copier import TransactionalMessage
 from kafkatest.utils import is_int
 from kafkatest.utils.transactions_utils import create_and_start_copiers
 from kafkatest.version import LATEST_3_1, LATEST_3_2, LATEST_3_3, LATEST_3_4, LATEST_3_5, \
-    DEV_BRANCH, KafkaVersion, LATEST_STABLE_METADATA_VERSION
+    DEV_BRANCH, KafkaVersion
 
 from ducktape.tests.test import Test
 from ducktape.mark import matrix
