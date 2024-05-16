@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from kafkatest.services.kafka import KafkaService, quorum, consumer_group
+from kafkatest.services.kafka import KafkaService, quorum
 from kafkatest.services.kafka.quorum import isolated_kraft
 from kafkatest.services.console_consumer import ConsoleConsumer
 from kafkatest.services.verifiable_producer import VerifiableProducer
@@ -74,11 +74,11 @@ class TransactionsMixedVersionsTest(Test):
                    (self.num_seed_messages, seed_timeout_sec))
         return seed_producer.acked
 
-    def get_messages_from_topic(self, topic, num_messages, group_protocol):
-        consumer = self.start_consumer(topic, group_id="verifying_consumer", group_protocol=group_protocol)
+    def get_messages_from_topic(self, topic, num_messages):
+        consumer = self.start_consumer(topic, group_id="verifying_consumer")
         return self.drain_consumer(consumer, num_messages)
 
-    def start_consumer(self, topic_to_read, group_id, group_protocol):
+    def start_consumer(self, topic_to_read, group_id):
         consumer = ConsoleConsumer(context=self.test_context,
                                    num_nodes=1,
                                    kafka=self.kafka,
@@ -86,8 +86,7 @@ class TransactionsMixedVersionsTest(Test):
                                    group_id=group_id,
                                    message_validator=is_int,
                                    from_beginning=True,
-                                   isolation_level="read_committed",
-                                   consumer_properties=consumer_group.maybe_set_group_protocol(group_protocol))
+                                   isolation_level="read_committed")
         consumer.start()
         # ensure that the consumer is up.
         wait_until(lambda: (len(consumer.messages_consumed[1]) > 0) == True,
@@ -113,7 +112,7 @@ class TransactionsMixedVersionsTest(Test):
 
     def copy_messages_transactionally(self, input_topic, output_topic,
                                       num_copiers, num_messages_to_copy,
-                                      use_group_metadata, group_protocol):
+                                      use_group_metadata):
         """Copies messages transactionally from the seeded input topic to the
         output topic.
 
@@ -133,8 +132,7 @@ class TransactionsMixedVersionsTest(Test):
                                            num_copiers=num_copiers,
                                            use_group_metadata=use_group_metadata)
         concurrent_consumer = self.start_consumer(output_topic,
-                                                  group_id="concurrent_consumer",
-                                                  group_protocol=group_protocol)
+                                                  group_id="concurrent_consumer")
 
         copier_timeout_sec = 120
         for copier in copiers:
@@ -180,10 +178,8 @@ class TransactionsMixedVersionsTest(Test):
     @matrix(
         old_kafka_version=[str(LATEST_3_5), str(LATEST_3_4), str(LATEST_3_3), str(LATEST_3_2), str(LATEST_3_1)],
         metadata_quorum=[isolated_kraft],
-        use_new_coordinator=[False],
-        group_protocol=[None]
     )
-    def test_transactions_mixed_versions(self, old_kafka_version, metadata_quorum=quorum.isolated_kraft, use_new_coordinator=False, group_protocol=None):
+    def test_transactions_mixed_versions(self, old_kafka_version, metadata_quorum=quorum.isolated_kraft):
         oldKafkaVersion = KafkaVersion(old_kafka_version)
         self.kafka = KafkaService(self.test_context,
                                   num_nodes=self.num_brokers,
@@ -206,8 +202,8 @@ class TransactionsMixedVersionsTest(Test):
         input_messages = self.seed_messages(self.input_topic, self.num_seed_messages)
         concurrently_consumed_messages = self.copy_messages_transactionally(
             input_topic=self.input_topic, output_topic=self.output_topic, num_copiers=self.num_input_partitions,
-            num_messages_to_copy=self.num_seed_messages, use_group_metadata=True, group_protocol=group_protocol)
-        output_messages = self.get_messages_from_topic(self.output_topic, self.num_seed_messages, group_protocol)
+            num_messages_to_copy=self.num_seed_messages, use_group_metadata=True)
+        output_messages = self.get_messages_from_topic(self.output_topic, self.num_seed_messages)
 
         concurrently_consumed_message_set = set(concurrently_consumed_messages)
         output_message_set = set(output_messages)
