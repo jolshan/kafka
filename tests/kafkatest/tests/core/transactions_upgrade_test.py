@@ -138,8 +138,8 @@ class TransactionsUpgradeTest(Test):
             self.kafka.start_node(node)
             self.wait_until_rejoin()
             self.logger.info("Successfully restarted broker node %s" % node.account.hostname)
-        self.logger.info("Changing metadata.version to %s" % LATEST_STABLE_METADATA_VERSION)
-        self.kafka.upgrade_metadata_version(LATEST_STABLE_METADATA_VERSION)
+        self.logger.info("Changing metadata.version to %s" % LATEST_METADATA_VERSION)
+        self.kafka.upgrade_metadata_version(LATEST_METADATA_VERSION)
 
     def copy_messages_transactionally_during_upgrade(self, input_topic, output_topic,
                                                      num_copiers, num_messages_to_copy,
