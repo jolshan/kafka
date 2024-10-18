@@ -206,6 +206,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                  use_new_coordinator=None,
                  consumer_group_migration_policy=None,
                  dynamicRaftQuorum=False,
+                 uses_transactions_v2=False
                  ):
         """
         :param context: test context
@@ -269,6 +270,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         :param use_new_coordinator: When true, use the new implementation of the group coordinator as per KIP-848. If this is None, the default existing group coordinator is used.
         :param consumer_group_migration_policy: The config that enables converting the non-empty classic group using the consumer embedded protocol to the non-empty consumer group using the consumer group protocol and vice versa.
         :param dynamicRaftQuorum: When true, the quorum uses kraft.version=1, controller_quorum_bootstrap_servers, and bootstraps the first controller using the standalone flag
+        :param uses_transactions_v2: When true, uses transaction.version=2 which allows for the usage of the new transaction protocol introduced via KIP-890
         """
 
         self.zk = zk
@@ -293,6 +295,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         
         # Assign the determined value.
         self.use_new_coordinator = use_new_coordinator
+        self.uses_transactions_v2 = uses_transactions_v2
 
         # Set consumer_group_migration_policy based on context and arguments.
         if consumer_group_migration_policy is None:
@@ -351,7 +354,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                     listener_security_config=listener_security_config,
                     extra_kafka_opts=extra_kafka_opts, tls_version=tls_version,
                     isolated_kafka=self, allow_zk_with_kraft=self.allow_zk_with_kraft,
-                    server_prop_overrides=server_prop_overrides, dynamicRaftQuorum=self.dynamicRaftQuorum
+                    server_prop_overrides=server_prop_overrides, dynamicRaftQuorum=self.dynamicRaftQuorum,
+                    uses_transactions_v2=self.uses_transactions_v2
                 )
                 self.controller_quorum = self.isolated_controller_quorum
 
@@ -882,12 +886,20 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
             cmd = "%s format --ignore-formatted --config %s --cluster-id %s" % (kafka_storage_script, KafkaService.CONFIG_FILE, config_property.CLUSTER_ID)
             if self.dynamicRaftQuorum:
                 cmd += " --feature kraft.version=1"
+<<<<<<< HEAD
                 if self.node_quorum_info.has_controller_role:
                     if self.standalone_controller_bootstrapped:
                         cmd += " --no-initial-controllers"
                     else:
                         cmd += " --standalone"
                         self.standalone_controller_bootstrapped = True
+=======
+                if not self.standalone_controller_bootstrapped and self.node_quorum_info.has_controller_role:
+                    cmd += " --standalone"
+                    self.standalone_controller_bootstrapped = True
+            if self.uses_transactions_v2:
+                cmd += " --feature transaction.version=2"
+>>>>>>> 394b79a28b (Update transactions system tests)
             self.logger.info("Running log directory format command...\n%s" % cmd)
             node.account.ssh(cmd)
 
@@ -930,6 +942,13 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         cmd = self.path.script("kafka-features.sh ")
         cmd += "--bootstrap-server %s " % self.bootstrap_servers()
         cmd += "%s --metadata %s" % (op, new_version)
+        self.logger.info("Running %s command...\n%s" % (op, cmd))
+        self.nodes[0].account.ssh(cmd)
+
+    def run_features_command(self, op, feature, new_version):
+        cmd = self.path.script("kafka-features.sh ")
+        cmd += "--bootstrap-server %s " % self.bootstrap_servers()
+        cmd += "%s --feature %s=%s" % (op, feature, new_version)
         self.logger.info("Running %s command...\n%s" % (op, cmd))
         self.nodes[0].account.ssh(cmd)
 

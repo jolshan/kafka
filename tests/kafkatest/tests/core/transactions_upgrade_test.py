@@ -21,7 +21,7 @@ from kafkatest.services.transactional_message_copier import TransactionalMessage
 from kafkatest.utils import is_int
 from kafkatest.utils.transactions_utils import create_and_start_copiers
 from kafkatest.version import LATEST_3_1, LATEST_3_2, LATEST_3_3, LATEST_3_4, LATEST_3_5, \
-    LATEST_3_6, LATEST_3_7, LATEST_3_8, DEV_BRANCH, KafkaVersion, LATEST_STABLE_METADATA_VERSION
+    LATEST_3_6, LATEST_3_7, LATEST_3_8, DEV_BRANCH, KafkaVersion, LATEST_STABLE_METADATA_VERSION, LATEST_STABLE_TRANSACTION_VERSION
 
 from ducktape.tests.test import Test
 from ducktape.mark import matrix
@@ -141,6 +141,8 @@ class TransactionsUpgradeTest(Test):
             self.logger.info("Successfully restarted broker node %s" % node.account.hostname)
         self.logger.info("Changing metadata.version to %s" % LATEST_STABLE_METADATA_VERSION)
         self.kafka.upgrade_metadata_version(LATEST_STABLE_METADATA_VERSION)
+        self.logger.info("Changing transaction.version to %s" % LATEST_STABLE_TRANSACTION_VERSION)
+        self.kafka.run_features_command("upgrade", "transaction.version", LATEST_STABLE_TRANSACTION_VERSION)
 
     def copy_messages_transactionally_during_upgrade(self, input_topic, output_topic,
                                                      num_copiers, num_messages_to_copy,
