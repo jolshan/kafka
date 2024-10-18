@@ -205,7 +205,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                  allow_zk_with_kraft=False,
                  quorum_info_provider=None,
                  use_new_coordinator=None,
-                 dynamicRaftQuorum=False
+                 dynamicRaftQuorum=False,
+                 uses_transactions_v2=False
                  ):
         """
         :param context: test context
@@ -268,6 +269,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         :param quorum_info_provider: A function that takes this KafkaService as an argument and returns a ServiceQuorumInfo. If this is None, then the ServiceQuorumInfo is generated from the test context
         :param use_new_coordinator: When true, use the new implementation of the group coordinator as per KIP-848. If this is None, the default existing group coordinator is used.
         :param dynamicRaftQuorum: When true, the quorum uses kraft.version=1, controller_quorum_bootstrap_servers, and bootstraps the first controller using the standalone flag
+        :param uses_transactions_v2: When true, uses transaction.version=2 which allows for the usage of the new transaction protocol introduced via KIP-890
         """
 
         self.zk = zk
@@ -292,6 +294,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         
         # Assign the determined value.
         self.use_new_coordinator = use_new_coordinator
+        self.uses_transactions_v2 = uses_transactions_v2
 
         if num_nodes < 1:
             raise Exception("Must set a positive number of nodes: %i" % num_nodes)
@@ -341,7 +344,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                     listener_security_config=listener_security_config,
                     extra_kafka_opts=extra_kafka_opts, tls_version=tls_version,
                     isolated_kafka=self, allow_zk_with_kraft=self.allow_zk_with_kraft,
-                    server_prop_overrides=server_prop_overrides, dynamicRaftQuorum=self.dynamicRaftQuorum
+                    server_prop_overrides=server_prop_overrides, dynamicRaftQuorum=self.dynamicRaftQuorum,
+                    uses_transactions_v2=self.uses_transactions_v2
                 )
                 self.controller_quorum = self.isolated_controller_quorum
 
@@ -872,6 +876,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                 if not self.standalone_controller_bootstrapped and self.node_quorum_info.has_controller_role:
                     cmd += " --standalone"
                     self.standalone_controller_bootstrapped = True
+            if self.uses_transactions_v2:
+                cmd += " --feature transaction.version=2"
             self.logger.info("Running log directory format command...\n%s" % cmd)
             node.account.ssh(cmd)
 
@@ -914,6 +920,13 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
         cmd = self.path.script("kafka-features.sh ")
         cmd += "--bootstrap-server %s " % self.bootstrap_servers()
         cmd += "%s --metadata %s" % (op, new_version)
+        self.logger.info("Running %s command...\n%s" % (op, cmd))
+        self.nodes[0].account.ssh(cmd)
+
+    def run_features_command(self, op, feature, new_version):
+        cmd = self.path.script("kafka-features.sh ")
+        cmd += "--bootstrap-server %s " % self.bootstrap_servers()
+        cmd += "%s --feature %s=%s" % (op, feature, new_version)
         self.logger.info("Running %s command...\n%s" % (op, cmd))
         self.nodes[0].account.ssh(cmd)
 
