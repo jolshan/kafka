@@ -218,10 +218,10 @@ public enum MetadataVersion {
     //
 
     // Add ELR related supports (KIP-966).
-    IBP_4_0_IV1(23, "4.0", "IV1", true),
+    IBP_4_0_IV2(24, "4.0", "IV2", true),
 
     // Bootstrap metadata version for transaction versions 1 and 2 (KIP-890)
-    IBP_4_0_IV2(24, "4.0", "IV2", false),
+    IBP_4_0_IV1(23, "4.0", "IV1", false),
 
     // Enables async remote LIST_OFFSETS support (KIP-1075)
     IBP_4_0_IV3(25, "4.0", "IV3", false);
@@ -250,7 +250,7 @@ public enum MetadataVersion {
      * <strong>Think carefully before you update this value. ONCE A METADATA VERSION IS PRODUCTION,
      * IT CANNOT BE CHANGED.</strong>
      */
-    public static final MetadataVersion LATEST_PRODUCTION = IBP_4_0_IV0;
+    public static final MetadataVersion LATEST_PRODUCTION = IBP_4_0_IV1;
     // If you change the value above please also update
     // LATEST_STABLE_METADATA_VERSION version in tests/kafkatest/version.py
 
@@ -351,7 +351,7 @@ public enum MetadataVersion {
     }
 
     public boolean isElrSupported() {
-        return this.isAtLeast(IBP_4_0_IV1);
+        return this.isAtLeast(IBP_4_0_IV2);
     }
 
     public boolean isKRaftSupported() {
