@@ -41,7 +41,7 @@ JDK_FULL="${JDK_FULL:-8u202-linux-x64}"
 
 if [ -z `which javac` ]; then
     apt-get -y update
-    apt-get install -y software-properties-common binutils java-common
+    apt-get install -y software-properties-common binutils java-common ntpdate
 
     echo "===> Installing JDK..." 
 
