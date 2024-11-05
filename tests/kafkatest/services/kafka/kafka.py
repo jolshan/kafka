@@ -894,6 +894,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
                         self.standalone_controller_bootstrapped = True
             if self.uses_transactions_v2:
                 cmd += " --feature transaction.version=2"
+            else:
+                cmd += " --feature transaction.version=1"
             self.logger.info("Running log directory format command...\n%s" % cmd)
             node.account.ssh(cmd)
 
