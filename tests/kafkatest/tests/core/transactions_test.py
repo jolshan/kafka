@@ -221,7 +221,7 @@ class TransactionsTest(Test):
         group_protocol=consumer_group.all_group_protocols,
         uses_transactions_v2=[True, False]
     )
-    def test_transactions(self, failure_mode, bounce_target, check_order, use_group_metadata, use_new_coordinator, uses_transactions_v2, group_protocol=None):
+    def test_transactions(self, failure_mode, bounce_target, check_order, use_group_metadata, metadata_quorum, use_new_coordinator, uses_transactions_v2, group_protocol=None):
         self.kafka = KafkaService(self.test_context,
                                   num_nodes=self.num_brokers,
                                   zk=None,
