@@ -33,6 +33,7 @@ from kafkatest.services.security.listener_security_config import ListenerSecurit
 from kafkatest.services.security.security_config import SecurityConfig
 from kafkatest.version import DEV_BRANCH
 from kafkatest.version import KafkaVersion
+from kafkatest.version import get_version
 from kafkatest.services.kafka.util import fix_opts_for_new_jvm
 
 
@@ -895,7 +896,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
             if self.uses_transactions_v2:
                 cmd += " --feature transaction.version=2"
             else:
-                if KafkaVersion.get_version(node).supports_feature_command:
+                if get_version(node).supports_feature_command:
                     cmd += " --feature transaction.version=1"
             self.logger.info("Running log directory format command...\n%s" % cmd)
             node.account.ssh(cmd)
