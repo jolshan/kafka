@@ -895,7 +895,8 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
             if self.uses_transactions_v2:
                 cmd += " --feature transaction.version=2"
             else:
-                cmd += " --feature transaction.version=1"
+                if KafkaVersion.get_version(node).supports_feature_command:
+                    cmd += " --feature transaction.version=1"
             self.logger.info("Running log directory format command...\n%s" % cmd)
             node.account.ssh(cmd)
 
@@ -929,12 +930,12 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
             raise Exception("No process ids recorded on node %s" % node.account.hostname)
 
     def upgrade_metadata_version(self, new_version):
-        self.run_features_command("upgrade", new_version)
+        self.run_metadata_features_command("upgrade", new_version)
 
     def downgrade_metadata_version(self, new_version):
-        self.run_features_command("downgrade", new_version)
+        self.run_metadata_features_command("downgrade", new_version)
 
-    def run_features_command(self, op, new_version):
+    def run_metadata_features_command(self, op, new_version):
         cmd = self.path.script("kafka-features.sh ")
         cmd += "--bootstrap-server %s " % self.bootstrap_servers()
         cmd += "%s --metadata %s" % (op, new_version)
