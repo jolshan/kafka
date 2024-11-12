@@ -896,6 +896,7 @@ class KafkaService(KafkaPathResolverMixin, JmxMixin, Service):
             if self.uses_transactions_v2:
                 cmd += " --feature transaction.version=2"
             else:
+                self.logger.info(get_version(node))
                 if get_version(node).supports_feature_command:
                     cmd += " --feature transaction.version=1"
             self.logger.info("Running log directory format command...\n%s" % cmd)
