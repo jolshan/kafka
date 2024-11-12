@@ -113,7 +113,7 @@ class KafkaVersion(LooseVersion):
         return hasattr(self, "version") and self >= V_3_4_0
 
     def supports_feature_command(self):
-        return self > LATEST_3_8
+        return self >= V_3_8_0
 
 def get_version(node=None):
     """Return the version attached to the given node.
