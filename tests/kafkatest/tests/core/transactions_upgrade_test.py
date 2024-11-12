@@ -143,6 +143,11 @@ class TransactionsUpgradeTest(Test):
         self.kafka.upgrade_metadata_version(LATEST_STABLE_METADATA_VERSION)
         self.logger.info("Changing transaction.version to %s" % LATEST_STABLE_TRANSACTION_VERSION)
         self.kafka.run_features_command("upgrade", "transaction.version", LATEST_STABLE_TRANSACTION_VERSION)
+        # Restart one broker to resend api versions
+        node = self.kafka.nodes[0]
+        self.kafka.stop_node(node)
+        self.kafka.start_node(node)
+        self.wait_until_rejoin()
 
     def copy_messages_transactionally_during_upgrade(self, input_topic, output_topic,
                                                      num_copiers, num_messages_to_copy,
