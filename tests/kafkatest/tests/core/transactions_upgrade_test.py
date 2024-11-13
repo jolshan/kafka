@@ -50,7 +50,7 @@ class TransactionsUpgradeTest(Test):
         # Test parameters
         self.num_input_partitions = 3
         self.num_output_partitions = 3
-        self.num_seed_messages = 3000
+        self.num_seed_messages = 7000
         self.transaction_size = 5
 
         # The transaction timeout should be lower than the progress timeout, but at
