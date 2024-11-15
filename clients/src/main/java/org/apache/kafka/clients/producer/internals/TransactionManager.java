@@ -432,6 +432,7 @@ public class TransactionManager {
 
     // Check all the finalized features from apiVersions to whether the transaction V2 is enabled.
     public synchronized void maybeUpdateTransactionV2Enabled() {
+        log.debug("Maybe updating TV2");
         if (latestFinalizedFeaturesEpoch >= apiVersions.getMaxFinalizedFeaturesEpoch()) {
             return;
         }
@@ -439,6 +440,7 @@ public class TransactionManager {
         latestFinalizedFeaturesEpoch = info.finalizedFeaturesEpoch;
         Short transactionVersion = info.finalizedFeatures.get("transaction.version");
         isTransactionV2Enabled = transactionVersion != null && transactionVersion >= 2;
+        log.debug("Updating isTV2 enabled to " + isTransactionV2Enabled);
     }
 
     public boolean isTransactionV2Enabled() {
