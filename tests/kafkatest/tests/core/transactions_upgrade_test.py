@@ -143,8 +143,8 @@ class TransactionsUpgradeTest(Test):
         self.kafka.upgrade_metadata_version(LATEST_STABLE_METADATA_VERSION)
         self.logger.info("Changing transaction.version to %s" % LATEST_STABLE_TRANSACTION_VERSION)
         self.kafka.run_features_command("upgrade", "transaction.version", LATEST_STABLE_TRANSACTION_VERSION)
-        # Restart one broker to resend api versions
-        node = self.kafka.nodes[0]
+        # Restart last broker to resend api versions
+        node = self.kafka.nodes[2]
         self.kafka.stop_node(node)
         self.kafka.start_node(node)
         self.wait_until_rejoin()
