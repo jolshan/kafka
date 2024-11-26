@@ -204,7 +204,7 @@ class TransactionsUpgradeTest(Test):
             }
         }
 
-    @cluster(num_nodes=10)
+    @cluster(num_nodes=8)
     @matrix(
         from_kafka_version=[str(LATEST_3_8), str(LATEST_3_7), str(LATEST_3_6), str(LATEST_3_5), str(LATEST_3_4), str(LATEST_3_3), str(LATEST_3_2), str(LATEST_3_1)],
         metadata_quorum=[isolated_kraft],
