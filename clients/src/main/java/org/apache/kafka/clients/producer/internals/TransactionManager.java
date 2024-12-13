@@ -312,7 +312,6 @@ public class TransactionManager {
         throwIfPendingState("beginTransaction");
         maybeFailWithError();
         transitionTo(State.IN_TRANSACTION);
-        maybeUpdateTransactionV2Enabled();
     }
 
     public synchronized TransactionalRequestResult beginCommit() {
@@ -352,7 +351,8 @@ public class TransactionManager {
         enqueueRequest(handler);
 
         // If an epoch bump is required for recovery, initialize the transaction after completing the EndTxn request.
-        if (clientSideEpochBumpRequired) {
+        // If we are upgrading to TV2 transactions on the next transaction, also bump the epoch.
+        if (clientSideEpochBumpRequired || maybeUpdateTransactionV2Enabled()) {
             return initializeTransactions(this.producerIdAndEpoch);
         }
 
@@ -437,16 +437,22 @@ public class TransactionManager {
         return transactionalId != null;
     }
 
-    // Check all the finalized features from apiVersions to whether the transaction V2 is enabled.
-    public synchronized void maybeUpdateTransactionV2Enabled() {
+    /**
+     *  Check all the finalized features from apiVersions to whether the transaction V2 is enabled.
+     * @return true if updated isTransactionV2Enabled to true -- meaning we are just enabling the TV2 protocol
+     */
+
+    public synchronized boolean maybeUpdateTransactionV2Enabled() {
         if (latestFinalizedFeaturesEpoch >= apiVersions.getMaxFinalizedFeaturesEpoch()) {
-            return;
+            return false;
         }
         ApiVersions.FinalizedFeaturesInfo info = apiVersions.getFinalizedFeaturesInfo();
         latestFinalizedFeaturesEpoch = info.finalizedFeaturesEpoch;
         Short transactionVersion = info.finalizedFeatures.get("transaction.version");
+        boolean previousValue = isTransactionV2Enabled;
         isTransactionV2Enabled = transactionVersion != null && transactionVersion >= 2;
         log.debug("Updating isTV2 enabled to {} with FinalizedFeaturesEpoch {}", isTransactionV2Enabled, latestFinalizedFeaturesEpoch);
+        return !previousValue && isTransactionV2Enabled;
     }
 
     public boolean isTransactionV2Enabled() {
