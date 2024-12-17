@@ -1667,6 +1667,8 @@ public class TransactionManager {
                 // When Transaction Version 2 is enabled, the end txn request 5+ is used,
                 // it mandates bumping the epoch after every transaction.
                 // If the epoch overflows, a new producerId is returned with epoch set to 0.
+                // Note, we still may see EndTxn TV1 (< 5) responses when the producer has upgraded to TV2 due to the upgrade
+                // occurring at the end of beginCompletingTransaction. The next transaction started should be TV2.
                 if (endTxnResponse.data().producerId() != -1) {
                     ProducerIdAndEpoch producerIdAndEpoch = new ProducerIdAndEpoch(
                         endTxnResponse.data().producerId(),
