@@ -4321,7 +4321,7 @@ public class TransactionManagerTest {
 
         prepareInitPidResponse(Errors.NONE, false, producerId, epoch);
         runUntil(transactionManager::hasProducerId);
-        transactionManager.maybeUpdateTransactionV2Enabled();
+        transactionManager.maybeUpdateTransactionV2Enabled(true);
 
         result.await();
         assertTrue(result.isSuccessful());

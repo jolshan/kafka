@@ -665,7 +665,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         sender.wakeup();
         result.await(maxBlockTimeMs, TimeUnit.MILLISECONDS);
         producerMetrics.recordInit(time.nanoseconds() - now);
-        transactionManager.maybeUpdateTransactionV2Enabled();
+        transactionManager.maybeUpdateTransactionV2Enabled(true);
     }
 
     /**

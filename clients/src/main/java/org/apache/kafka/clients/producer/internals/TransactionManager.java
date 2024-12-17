@@ -356,7 +356,7 @@ public class TransactionManager {
 
         // If an epoch bump is required for recovery, initialize the transaction after completing the EndTxn request.
         // If we are upgrading to TV2 transactions on the next transaction, also bump the epoch.
-        maybeUpdateTransactionV2Enabled();
+        maybeUpdateTransactionV2Enabled(false);
         if (clientSideEpochBumpRequired || isUpgradingToV2) {
             return initializeTransactions(this.producerIdAndEpoch);
         }
@@ -447,17 +447,17 @@ public class TransactionManager {
      *  Sets isUpgradingToV2 if the previous value was false and now it is true.
      */
 
-    public synchronized void maybeUpdateTransactionV2Enabled() {
+    public synchronized void maybeUpdateTransactionV2Enabled(boolean onInitiatialization) {
         if (latestFinalizedFeaturesEpoch >= apiVersions.getMaxFinalizedFeaturesEpoch()) {
             return;
         }
         ApiVersions.FinalizedFeaturesInfo info = apiVersions.getFinalizedFeaturesInfo();
         latestFinalizedFeaturesEpoch = info.finalizedFeaturesEpoch;
         Short transactionVersion = info.finalizedFeatures.get("transaction.version");
-        boolean previousValue = isTransactionV2Enabled;
+        boolean wasTransactionV2Enabled = isTransactionV2Enabled;
         isTransactionV2Enabled = transactionVersion != null && transactionVersion >= 2;
-        isUpgradingToV2 = currentState != State.READY && !previousValue && isTransactionV2Enabled;
         log.debug("Updating isTV2 enabled to {} with FinalizedFeaturesEpoch {}", isTransactionV2Enabled, latestFinalizedFeaturesEpoch);
+        isUpgradingToV2 = !onInitiatialization && !wasTransactionV2Enabled && isTransactionV2Enabled;
     }
 
     public boolean isTransactionV2Enabled() {
