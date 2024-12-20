@@ -34,14 +34,13 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.clients.admin.{Admin, AdminClientConfig, AlterConfigOp, AlterConfigsResult, ConfigEntry}
 import org.apache.kafka.server.config.ReplicationConfigs
 import org.apache.kafka.server.metrics.KafkaYammerMetrics
-import org.apache.logging.log4j.{Level, LogManager}
+import org.apache.log4j.{Level, Logger}
 import org.junit.jupiter.api.{AfterEach, BeforeEach, TestInfo}
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import com.yammer.metrics.core.Meter
 import org.apache.kafka.metadata.LeaderConstants
-import org.apache.logging.log4j.core.config.Configurator
 
 class UncleanLeaderElectionTest extends QuorumTestHarness {
   val brokerId1 = 0
@@ -64,8 +63,8 @@ class UncleanLeaderElectionTest extends QuorumTestHarness {
   val partitionId = 0
   val topicPartition = new TopicPartition(topic, partitionId)
 
-  val kafkaApisLogger = LogManager.getLogger(classOf[kafka.server.KafkaApis])
-  val networkProcessorLogger = LogManager.getLogger(classOf[kafka.network.Processor])
+  val kafkaApisLogger = Logger.getLogger(classOf[kafka.server.KafkaApis])
+  val networkProcessorLogger = Logger.getLogger(classOf[kafka.network.Processor])
 
   @BeforeEach
   override def setUp(testInfo: TestInfo): Unit = {
@@ -81,8 +80,8 @@ class UncleanLeaderElectionTest extends QuorumTestHarness {
     }
 
     // temporarily set loggers to a higher level so that tests run quietly
-    Configurator.setLevel(kafkaApisLogger.getName, Level.FATAL)
-    Configurator.setLevel(networkProcessorLogger.getName, Level.FATAL)
+    kafkaApisLogger.setLevel(Level.FATAL)
+    networkProcessorLogger.setLevel(Level.FATAL)
   }
 
   @AfterEach
@@ -91,8 +90,8 @@ class UncleanLeaderElectionTest extends QuorumTestHarness {
     brokers.foreach(broker => CoreUtils.delete(broker.config.logDirs))
 
     // restore log levels
-    Configurator.setLevel(kafkaApisLogger.getName, Level.ERROR)
-    Configurator.setLevel(networkProcessorLogger.getName, Level.ERROR)
+    kafkaApisLogger.setLevel(Level.ERROR)
+    networkProcessorLogger.setLevel(Level.ERROR)
 
     admin.close()
 

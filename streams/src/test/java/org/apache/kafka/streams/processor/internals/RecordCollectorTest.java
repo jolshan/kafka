@@ -59,8 +59,7 @@ import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.apache.kafka.test.InternalMockProcessorContext;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.filter.ThresholdFilter;
+import org.apache.log4j.Level;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1284,7 +1283,7 @@ public class RecordCollectorTest {
 
         try (final LogCaptureAppender logCaptureAppender =
                  LogCaptureAppender.createAndRegister(RecordCollectorImpl.class)) {
-            logCaptureAppender.addFilter(ThresholdFilter.createFilter(Level.INFO, null, null));
+            logCaptureAppender.setThreshold(Level.INFO);
 
             collector.send(topic, "3", "0", null, null, stringSerializer, stringSerializer, sinkNodeName, context, streamPartitioner);
             collector.flush();
